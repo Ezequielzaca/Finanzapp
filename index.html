@@ -1355,10 +1355,10 @@
             activeTab: 'inicio',
             editingTxId: null,
             editingCuentaId: null,
-            driveScriptUrl: ''  // URL del Apps Script
+            driveScriptUrl: ''
         };
 
-        // Cargar desde localStorage
+        // ========== LOCAL STORAGE ==========
         function loadState() {
             try {
                 const saved = localStorage.getItem('finanzapp_state');
@@ -1368,15 +1368,21 @@
                     state.transactions = parsed.transactions || [];
                     state.driveScriptUrl = parsed.driveScriptUrl || '';
                 }
-            } catch (e) { }
+            } catch (e) { console.error('loadState error:', e); }
         }
 
         function saveState() {
-            localStorage.setItem('finanzapp_state', JSON.stringify({
-                cuentas: state.cuentas,
-                transactions: state.transactions,
-                driveScriptUrl: state.driveScriptUrl
-            }));
+            try {
+                localStorage.setItem('finanzapp_state', JSON.stringify({
+                    cuentas: state.cuentas,
+                    transactions: state.transactions,
+                    driveScriptUrl: state.driveScriptUrl
+                }));
+            } catch (e) {
+                // localStorage lleno (puede pasar con muchos adjuntos grandes)
+                console.error('saveState error:', e);
+                alert('⚠️ No se pudo guardar. El almacenamiento local está lleno. Exportá un backup y borrá datos antiguos.');
+            }
         }
 
         // ========== FORMAT ==========
