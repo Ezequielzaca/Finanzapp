@@ -3,7 +3,11 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0e0f14">
     <title>FinanzApp</title>
     <link
         href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap"
@@ -33,11 +37,14 @@
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             flex-direction: column;
             max-width: 480px;
             margin: 0 auto;
             position: relative;
+            overflow-x: hidden;
+            -webkit-text-size-adjust: 100%;
         }
 
         /* HEADER */
@@ -1117,6 +1124,16 @@
             </div>
             <div id="listCuentasGastos"></div>
         </div>
+
+        <!-- TAB 5: ALERTAS -->
+        <div class="tab" id="tab-alertas">
+            <div class="section-title">
+                <span>🔔 Mis Alertas</span>
+                <button class="add-btn" onclick="openAlertaModal()">+ Alerta</button>
+            </div>
+            <div id="listAlertas"></div>
+            <div id="alertasTriggeradas" style="margin-top:8px"></div>
+        </div>
     </div>
 
     <!-- BOTTOM NAV -->
@@ -1157,6 +1174,14 @@
                 <line x1="5" y1="5" x2="19" y2="5" />
             </svg>
             Gastos
+        </button>
+        <button class="nav-btn" id="nav-alertas" onclick="switchTab('alertas')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 01-3.46 0" />
+            </svg>
+            Alertas
         </button>
     </nav>
 
@@ -1201,6 +1226,10 @@
                 </select>
             </div>
             <div class="form-group">
+                <label>Fecha</label>
+                <input id="txFecha" type="date" />
+            </div>
+            <div class="form-group">
                 <label>Monto</label>
                 <input id="txMonto" type="number" placeholder="0.00" min="0" step="0.01" />
             </div>
@@ -1237,6 +1266,7 @@
                     <option value="cripto">🪙 Criptomonedas</option>
                     <option value="efectivo">💵 Efectivo / Dinero</option>
                     <option value="bolsa">📈 Inversiones Bolsa</option>
+                    <option value="plazo_fijo">🏛 Plazo Fijo</option>
                     <option value="otro">📦 Otro</option>
                     <option value="tarjeta_credito">💰 Tarjeta Crédito</option>
                     <option value="tarjeta_debito">💳 Tarjeta Débito</option>
@@ -1330,7 +1360,38 @@
         </div>
     </div>
 
-    <!-- VISOR COMPROBANTE -->
+    <!-- MODAL ALERTA -->
+    <div class="modal-overlay" id="alertaModal">
+        <div class="modal">
+            <div class="modal-title">
+                <span id="alertaModalTitle">🔔 Nueva Alerta</span>
+                <div class="modal-close" onclick="closeModal('alertaModal')">✕</div>
+            </div>
+            <div class="form-group">
+                <label>Descripción</label>
+                <input id="alertaDesc" placeholder="Ej: Saldo bajo en billetera, Vence el alquiler..." />
+            </div>
+            <div class="form-group">
+                <label>Cuenta a monitorear <span style="color:var(--muted);font-size:11px">(opcional)</span></label>
+                <select id="alertaCuenta">
+                    <option value="">— Sin cuenta específica —</option>
+                </select>
+            </div>
+            <div class="form-group" id="alertaUmbralGroup">
+                <label>Avisar cuando el saldo baje de</label>
+                <input id="alertaUmbral" type="number" placeholder="0.00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+                <label>Fecha de aviso <span style="color:var(--muted);font-size:11px">(opcional, para recordatorios de
+                        fecha)</span></label>
+                <input id="alertaFecha" type="date" />
+            </div>
+            <button class="submit-btn" onclick="saveAlerta()">Guardar Alerta</button>
+            <button class="modal-delete-btn" id="alertaDeleteBtn" onclick="deleteAlertaFromModal()"
+                style="display:none">🗑 Eliminar alerta</button>
+        </div>
+    </div>
+
     <div class="viewer-overlay" id="viewerOverlay">
         <div class="viewer-header">
             <span class="viewer-title" id="viewerTitle">Comprobante</span>
@@ -1348,6 +1409,7 @@
         let state = {
             cuentas: [],
             transactions: [],
+            alertas: [],
             currentMonth: new Date().getMonth(),
             currentYear: new Date().getFullYear(),
             resumenFilter: 'mes',
@@ -1355,6 +1417,7 @@
             activeTab: 'inicio',
             editingTxId: null,
             editingCuentaId: null,
+            editingAlertaId: null,
             driveScriptUrl: ''
         };
 
@@ -1366,6 +1429,7 @@
                     const parsed = JSON.parse(saved);
                     state.cuentas = parsed.cuentas || [];
                     state.transactions = parsed.transactions || [];
+                    state.alertas = parsed.alertas || [];
                     state.driveScriptUrl = parsed.driveScriptUrl || '';
                 }
             } catch (e) { console.error('loadState error:', e); }
@@ -1376,10 +1440,10 @@
                 localStorage.setItem('finanzapp_state', JSON.stringify({
                     cuentas: state.cuentas,
                     transactions: state.transactions,
+                    alertas: state.alertas,
                     driveScriptUrl: state.driveScriptUrl
                 }));
             } catch (e) {
-                // localStorage lleno (puede pasar con muchos adjuntos grandes)
                 console.error('saveState error:', e);
                 alert('⚠️ No se pudo guardar. El almacenamiento local está lleno. Exportá un backup y borrá datos antiguos.');
             }
@@ -1528,6 +1592,7 @@
                 exportDate: new Date().toISOString(),
                 cuentas: state.cuentas,
                 transactions: state.transactions,
+                alertas: state.alertas,
                 driveScriptUrl: state.driveScriptUrl
             };
             const json = JSON.stringify(data, null, 2);
@@ -1558,6 +1623,7 @@
                     if (!confirm(`¿Importar ${nCuentas} cuentas y ${nTx} movimientos?\n\nEsto REEMPLAZA todos los datos actuales.`)) return;
                     state.cuentas = data.cuentas;
                     state.transactions = data.transactions;
+                    state.alertas = data.alertas || [];
                     state.driveScriptUrl = data.driveScriptUrl || state.driveScriptUrl;
                     saveState();
                     render();
@@ -1637,7 +1703,7 @@
         function renderTxList(elId, txs, type) {
             const el = document.getElementById(elId);
             if (txs.length === 0) {
-                el.innerHTML = `<div class="empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><div>Sin movimientos</div></div>`;
+                el.innerHTML = `<div class="empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><div>Sin movimientos este mes</div></div>`;
                 return;
             }
             el.innerHTML = txs.sort((a, b) => new Date(b.date) - new Date(a.date)).map(t => {
@@ -1650,12 +1716,14 @@
                 const attachBadge = t.attachment
                     ? `<div class="tx-attach-badge" onclick="event.stopPropagation();openViewer('${t.id}')">📎 ${t.attachment.name.length > 18 ? t.attachment.name.slice(0, 18) + '…' : t.attachment.name}</div>`
                     : '';
+                const d = new Date(t.date);
+                const fechaTxt = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
                 return `
     <div class="tx-row" onclick="editTx('${t.id}')">
       <div class="tx-dot ${type}">${type === 'income' ? '▲' : '▼'}</div>
       <div class="tx-info">
         <div class="tx-concept">${t.concepto}</div>
-        <div class="tx-desc">${subLine || '—'}</div>
+        <div class="tx-desc">${subLine || '—'} <span style="color:var(--muted);font-size:11px;margin-left:4px">${fechaTxt}</span></div>
         ${attachBadge}
       </div>
       <div class="tx-right">
@@ -1755,6 +1823,7 @@
             cripto: { label: 'Criptomonedas', icon: '🪙', group: 'Inversiones' },
             efectivo: { label: 'Efectivo / Dinero', icon: '💵', group: 'Activos' },
             bolsa: { label: 'Inversiones Bolsa', icon: '📈', group: 'Inversiones' },
+            plazo_fijo: { label: 'Plazo Fijo', icon: '🏛', group: 'Inversiones' },
             otro: { label: 'Otro', icon: '📦', group: 'Activos' },
             tarjeta_credito: { label: 'Tarjeta Crédito', icon: '💰', group: 'Tarjetas' },
             tarjeta_debito: { label: 'Tarjeta Débito', icon: '💳', group: 'Activos' },
@@ -1879,9 +1948,22 @@
                 el.innerHTML = `<div class="empty"><div>No hay cuentas de gasto. ¡Agregá la primera!</div></div>`;
                 return;
             }
-            // sort by label
-            const sorted = [...gasCuentas].sort((a, b) => (TIPO_INFO[a.tipo]?.label || '').localeCompare(TIPO_INFO[b.tipo]?.label || ''));
-            el.innerHTML = sorted.map(c => buildCuentaRow(c)).join('');
+
+            // Separar usadas (con txs) de no usadas
+            const usadas = gasCuentas.filter(c => state.transactions.some(t => t.cuentaId === c.id));
+            const noUsadas = gasCuentas.filter(c => !state.transactions.some(t => t.cuentaId === c.id));
+            const sortFn = (a, b) => (TIPO_INFO[a.tipo]?.label || '').localeCompare(TIPO_INFO[b.tipo]?.label || '');
+
+            let html = '';
+            if (usadas.length > 0) {
+                html += `<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);padding:8px 4px 4px">Utilizadas</div>`;
+                html += [...usadas].sort(sortFn).map(c => buildCuentaRow(c)).join('');
+            }
+            if (noUsadas.length > 0) {
+                html += `<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:12px 4px 4px">Sin movimientos</div>`;
+                html += [...noUsadas].sort(sortFn).map(c => buildCuentaRow(c)).join('');
+            }
+            el.innerHTML = html;
         }
 
         function buildCuentaRow(c) {
@@ -1910,6 +1992,12 @@
             document.getElementById('txConcepto').value = '';
             document.getElementById('txMonto').value = '';
             document.getElementById('txCategoria').value = '';
+            // Default fecha = hoy
+            const hoy = new Date();
+            const yyyy = hoy.getFullYear();
+            const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+            const dd = String(hoy.getDate()).padStart(2, '0');
+            document.getElementById('txFecha').value = `${yyyy}-${mm}-${dd}`;
             document.getElementById('modalTxTitle').textContent = 'Nueva Transacción';
             document.getElementById('txDeleteBtn').style.display = 'none';
             removeAttach();
@@ -1927,6 +2015,12 @@
             document.getElementById('txMonto').value = t.monto;
             document.getElementById('txCuenta').value = t.cuentaId || '';
             document.getElementById('txCategoria').value = t.categoria || '';
+            // Fecha
+            const d = new Date(t.date);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            document.getElementById('txFecha').value = `${yyyy}-${mm}-${dd}`;
             document.getElementById('modalTxTitle').textContent = '✏️ Editar';
             document.getElementById('txDeleteBtn').style.display = 'block';
             removeAttach();
@@ -1966,6 +2060,7 @@
       <option value="cripto">🪙 Criptomonedas</option>
       <option value="efectivo">💵 Efectivo / Dinero</option>
       <option value="bolsa">📈 Inversiones Bolsa</option>
+      <option value="plazo_fijo">🏛 Plazo Fijo</option>
       <option value="otro">📦 Otro</option>
       <option value="tarjeta_credito">💰 Tarjeta Crédito</option>
       <option value="tarjeta_debito">💳 Tarjeta Débito</option>`;
@@ -2024,23 +2119,31 @@
             const monto = parseFloat(document.getElementById('txMonto').value);
             const cuentaId = document.getElementById('txCuenta').value;
             const categoria = document.getElementById('txCategoria').value;
+            const fechaVal = document.getElementById('txFecha').value;
 
             if (!concepto || isNaN(monto) || monto <= 0) {
                 alert('Por favor completá concepto y monto válido.');
                 return;
             }
 
-            let txDate = new Date(state.currentYear, state.currentMonth, new Date().getDate()).toISOString();
+            // Construir fecha desde el campo — si no hay valor, usar hoy
+            let txDate;
+            if (fechaVal) {
+                const [y, m, d] = fechaVal.split('-').map(Number);
+                txDate = new Date(y, m - 1, d, 12, 0, 0).toISOString();
+            } else {
+                txDate = new Date().toISOString();
+            }
+
             const fileToUpload = pendingFile;
-            const isNew = !state.editingTxId;
 
             if (state.editingTxId) {
                 const idx = state.transactions.findIndex(t => t.id === state.editingTxId);
                 if (idx !== -1) {
-                    txDate = state.transactions[idx].date;
                     state.transactions[idx] = {
                         ...state.transactions[idx],
                         type: state.txType, concepto, monto, cuentaId, categoria,
+                        date: txDate,
                         attachment: pendingFile || state.transactions[idx].attachment || null
                     };
                 }
@@ -2056,7 +2159,6 @@
             closeModal('txModal');
             render();
 
-            // Upload to Drive if file attached (new or changed)
             if (fileToUpload && state.driveScriptUrl) {
                 uploadToDrive(fileToUpload, state.txType, concepto, txDate)
                     .then(result => showDriveToast(result, concepto));
@@ -2136,6 +2238,130 @@
             renderInicio();
             renderResumen();
             renderCuentas();
+            renderAlertas();
+        }
+
+        // ========== ALERTAS ==========
+        function openAlertaModal() {
+            state.editingAlertaId = null;
+            document.getElementById('alertaModalTitle').textContent = '🔔 Nueva Alerta';
+            document.getElementById('alertaDesc').value = '';
+            document.getElementById('alertaUmbral').value = '';
+            document.getElementById('alertaFecha').value = '';
+            document.getElementById('alertaDeleteBtn').style.display = 'none';
+            // Populate cuenta select
+            const sel = document.getElementById('alertaCuenta');
+            sel.innerHTML = '<option value="">— Sin cuenta específica —</option>' +
+                state.cuentas.map(c => `<option value="${c.id}">${TIPO_INFO[c.tipo]?.icon || ''} ${c.nombre}</option>`).join('');
+            document.getElementById('alertaModal').classList.add('open');
+        }
+
+        function editAlerta(id) {
+            const a = state.alertas.find(x => x.id === id);
+            if (!a) return;
+            state.editingAlertaId = id;
+            document.getElementById('alertaModalTitle').textContent = '✏️ Editar Alerta';
+            document.getElementById('alertaDesc').value = a.desc;
+            document.getElementById('alertaUmbral').value = a.umbral || '';
+            document.getElementById('alertaFecha').value = a.fecha || '';
+            document.getElementById('alertaDeleteBtn').style.display = 'block';
+            const sel = document.getElementById('alertaCuenta');
+            sel.innerHTML = '<option value="">— Sin cuenta específica —</option>' +
+                state.cuentas.map(c => `<option value="${c.id}">${TIPO_INFO[c.tipo]?.icon || ''} ${c.nombre}</option>`).join('');
+            sel.value = a.cuentaId || '';
+            document.getElementById('alertaModal').classList.add('open');
+        }
+
+        function saveAlerta() {
+            const desc = document.getElementById('alertaDesc').value.trim();
+            const cuentaId = document.getElementById('alertaCuenta').value;
+            const umbral = parseFloat(document.getElementById('alertaUmbral').value) || null;
+            const fecha = document.getElementById('alertaFecha').value || null;
+            if (!desc) { alert('Ingresá una descripción.'); return; }
+
+            if (state.editingAlertaId) {
+                const idx = state.alertas.findIndex(a => a.id === state.editingAlertaId);
+                if (idx !== -1) state.alertas[idx] = { ...state.alertas[idx], desc, cuentaId, umbral, fecha };
+            } else {
+                state.alertas.push({ id: uid(), desc, cuentaId, umbral, fecha, activa: true });
+            }
+            saveState();
+            closeModal('alertaModal');
+            renderAlertas();
+        }
+
+        function deleteAlertaFromModal() {
+            if (!confirm('¿Eliminar esta alerta?')) return;
+            state.alertas = state.alertas.filter(a => a.id !== state.editingAlertaId);
+            saveState();
+            closeModal('alertaModal');
+            renderAlertas();
+        }
+
+        function toggleAlerta(id) {
+            const a = state.alertas.find(x => x.id === id);
+            if (a) { a.activa = !a.activa; saveState(); renderAlertas(); }
+        }
+
+        function renderAlertas() {
+            const el = document.getElementById('listAlertas');
+            const trigEl = document.getElementById('alertasTriggeradas');
+            if (!el) return;
+
+            // Verificar alertas disparadas
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+            const disparadas = [];
+
+            state.alertas.forEach(a => {
+                if (!a.activa) return;
+                // Alerta por saldo bajo
+                if (a.cuentaId && a.umbral !== null) {
+                    const cuenta = state.cuentas.find(c => c.id === a.cuentaId);
+                    if (cuenta) {
+                        const saldo = calcSaldo(cuenta);
+                        if (saldo <= a.umbral) disparadas.push({ a, motivo: `💰 Saldo de ${cuenta.nombre}: ${fmt(saldo)} (límite: ${fmt(a.umbral)})` });
+                    }
+                }
+                // Alerta por fecha
+                if (a.fecha) {
+                    const fAlerta = new Date(a.fecha + 'T00:00:00');
+                    if (fAlerta <= hoy) disparadas.push({ a, motivo: `📅 Fecha de alerta: ${a.fecha.split('-').reverse().join('/')}` });
+                }
+            });
+
+            // Mostrar alertas disparadas arriba en rojo
+            trigEl.innerHTML = disparadas.map(({ a, motivo }) => `
+    <div style="background:rgba(255,94,94,.1);border:1px solid rgba(255,94,94,.3);border-radius:12px;padding:12px 14px;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:600;color:var(--red)">⚠️ ${a.desc}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">${motivo}</div>
+    </div>`).join('');
+
+            if (state.alertas.length === 0) {
+                el.innerHTML = `<div class="empty"><div style="font-size:32px;margin-bottom:8px">🔔</div><div>Sin alertas. Creá una con + Alerta</div></div>`;
+                return;
+            }
+
+            el.innerHTML = state.alertas.map(a => {
+                const cuenta = a.cuentaId ? state.cuentas.find(c => c.id === a.cuentaId) : null;
+                const detalle = [
+                    cuenta ? `${TIPO_INFO[cuenta.tipo]?.icon || ''} ${cuenta.nombre}` : null,
+                    a.umbral !== null ? `Aviso al bajar de ${fmt(a.umbral)}` : null,
+                    a.fecha ? `📅 ${a.fecha.split('-').reverse().join('/')}` : null
+                ].filter(Boolean).join(' · ');
+                return `
+    <div class="tx-row" onclick="editAlerta('${a.id}')" style="opacity:${a.activa ? 1 : 0.45}">
+      <div class="tx-dot" style="background:${a.activa ? 'rgba(200,241,53,.15)' : 'rgba(122,126,148,.1)'};color:${a.activa ? 'var(--accent)' : 'var(--muted)'};font-size:16px;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center">🔔</div>
+      <div class="tx-info">
+        <div class="tx-concept">${a.desc}</div>
+        <div class="tx-desc">${detalle || 'Recordatorio manual'}</div>
+      </div>
+      <div class="tx-right">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation()">
+          <input type="checkbox" ${a.activa ? 'checked' : ''} onchange="toggleAlerta('${a.id}')" style="accent-color:var(--accent);width:16px;height:16px">
+        </label>
+      </div>
+    </div>`;
+            }).join('');
         }
 
         // ========== INIT ==========
