@@ -1218,7 +1218,14 @@
             <div class="form-group">
                 <label>Cuenta <span style="color:var(--muted);font-size:11px">(de dónde sale / entra el
                         dinero)</span></label>
-                <select id="txCuenta"></select>
+                <select id="txCuenta" onchange="onCuentaChange()"></select>
+            </div>
+            <!-- Campo USD - solo visible cuando la cuenta es dólar -->
+            <div class="form-group" id="grupUSD" style="display:none">
+                <label>💵 Monto en dólares (USD)</label>
+                <input id="txMontoUSD" type="number" placeholder="100.00" min="0" step="0.01"
+                    oninput="convertUSDtoARS()" />
+                <div id="usdConvInfo" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
             </div>
             <div class="form-group" id="grupCategoria" style="display:none">
                 <label>Categoría <span style="color:var(--muted);font-size:11px">(tipo de gasto)</span></label>
@@ -1277,6 +1284,9 @@
                     <option value="banco">🏦 Banco</option>
                     <option value="cripto">🪙 Criptomonedas</option>
                     <option value="efectivo">💵 Efectivo / Dinero</option>
+                    <option value="dolar">🇺🇸 Dólares (USD)</option>
+                    <option value="guarani">🇵🇾 Guaraníes (PYG)</option>
+                    <option value="real">🇧🇷 Reales (BRL)</option>
                     <option value="bolsa">📈 Inversiones Bolsa</option>
                     <option value="plazo_fijo">🏛 Plazo Fijo</option>
                     <option value="otro">📦 Otro</option>
@@ -1332,6 +1342,21 @@
                     style="color:var(--accent)">INSTRUCCIONES_DRIVE.md</b> que descargaste junto con esta app.
             </div>
             <button class="submit-btn" onclick="saveSettings()">Guardar URL</button>
+
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+                <div
+                    style="background:rgba(53,241,160,.07);border:1px solid rgba(53,241,160,.2);border-radius:12px;padding:14px;margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.6">
+                    <b style="color:var(--accent2)">💱 Cotizaciones (USD / Guaraní / Real)</b><br>
+                    Pegá aquí la URL de tu Apps Script de cotizaciones para ver precios actualizados en tus cuentas en
+                    moneda extranjera.
+                </div>
+                <div class="form-group">
+                    <label>URL del Script de Cotizaciones</label>
+                    <input id="settingsCotizUrl" placeholder="https://script.google.com/macros/s/.../exec"
+                        style="font-size:12px" />
+                </div>
+                <button class="submit-btn" onclick="saveCotizSettings()">Guardar URL Cotizaciones</button>
+            </div>
 
             <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
                 <div
@@ -1430,7 +1455,8 @@
             editingTxId: null,
             editingCuentaId: null,
             editingAlertaId: null,
-            driveScriptUrl: ''
+            driveScriptUrl: '',
+            cotizProxyUrl: ''
         };
 
         // ========== LOCAL STORAGE ==========
@@ -1443,6 +1469,7 @@
                     state.transactions = parsed.transactions || [];
                     state.alertas = parsed.alertas || [];
                     state.driveScriptUrl = parsed.driveScriptUrl || '';
+                    state.cotizProxyUrl = parsed.cotizProxyUrl || '';
                 }
             } catch (e) { console.error('loadState error:', e); }
         }
@@ -1453,7 +1480,8 @@
                     cuentas: state.cuentas,
                     transactions: state.transactions,
                     alertas: state.alertas,
-                    driveScriptUrl: state.driveScriptUrl
+                    driveScriptUrl: state.driveScriptUrl,
+                    cotizProxyUrl: state.cotizProxyUrl
                 }));
             } catch (e) {
                 console.error('saveState error:', e);
@@ -1587,7 +1615,8 @@
 
         function openSettings() {
             document.getElementById('settingsModal').classList.add('open');
-            document.getElementById('settingsUrl').value = state.driveScriptUrl;
+            document.getElementById('settingsUrl').value = state.driveScriptUrl || '';
+            document.getElementById('settingsCotizUrl').value = state.cotizProxyUrl || '';
         }
 
         function saveSettings() {
@@ -1595,6 +1624,14 @@
             saveState();
             closeModal('settingsModal');
             showDriveToast({ ok: true, path: 'URL guardada correctamente ✓' });
+        }
+
+        function saveCotizSettings() {
+            state.cotizProxyUrl = document.getElementById('settingsCotizUrl').value.trim();
+            saveState();
+            closeModal('settingsModal');
+            showDriveToast({ ok: true, path: 'URL de cotizaciones guardada ✓' });
+            if (state.cotizProxyUrl) fetchCotizaciones();
         }
 
         // ========== EXPORTAR / IMPORTAR ==========
@@ -1977,6 +2014,9 @@
             banco: { label: 'Banco', icon: '🏦', group: 'Activos' },
             cripto: { label: 'Criptomonedas', icon: '🪙', group: 'Inversiones' },
             efectivo: { label: 'Efectivo / Dinero', icon: '💵', group: 'Activos' },
+            dolar: { label: 'Dólares (USD)', icon: '🇺🇸', group: 'Activos' },
+            guarani: { label: 'Guaraníes (PYG)', icon: '🇵🇾', group: 'Activos' },
+            real: { label: 'Reales (BRL)', icon: '🇧🇷', group: 'Activos' },
             bolsa: { label: 'Inversiones Bolsa', icon: '📈', group: 'Inversiones' },
             plazo_fijo: { label: 'Plazo Fijo', icon: '🏛', group: 'Inversiones' },
             otro: { label: 'Otro', icon: '📦', group: 'Activos' },
@@ -2125,6 +2165,48 @@
             const saldo = calcSaldo(c);
             const info = TIPO_INFO[c.tipo] || { icon: '📦', label: 'Otro' };
             const yearBreakdown = buildYearBreakdown(c);
+            const esFX = ['dolar', 'guarani', 'real'].includes(c.tipo);
+
+            let saldoDisplay, extraInfo = '';
+
+            if (esFX) {
+                const nominalFX = calcNominalUSD(c); // reutilizamos — guarda montoUSD genérico
+                let valorARS = null, fxLabel = '', cotizTxt = '';
+
+                if (c.tipo === 'dolar' && cotizaciones.usd) {
+                    valorARS = nominalFX * cotizaciones.usd.venta;
+                    fxLabel = `USD ${nominalFX.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    cotizTxt = `🏦 Oficial BN: compra $${cotizaciones.usd.compra.toLocaleString('es-AR')} / venta $${cotizaciones.usd.venta.toLocaleString('es-AR')}`;
+                } else if (c.tipo === 'guarani' && cotizaciones.pyg) {
+                    valorARS = nominalFX * cotizaciones.pyg.arsPerPYG;
+                    fxLabel = `₲ ${nominalFX.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+                    cotizTxt = `1 ₲ = $${cotizaciones.pyg.arsPerPYG.toLocaleString('es-AR', { minimumFractionDigits: 4 })} ARS`;
+                } else if (c.tipo === 'real' && cotizaciones.brl) {
+                    valorARS = nominalFX * cotizaciones.brl.arsPerBRL;
+                    fxLabel = `R$ ${nominalFX.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    cotizTxt = `1 R$ = $${cotizaciones.brl.arsPerBRL.toLocaleString('es-AR', { minimumFractionDigits: 2 })} ARS`;
+                } else {
+                    fxLabel = `${nominalFX.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`;
+                }
+
+                saldoDisplay = `<div style="text-align:right">
+      <div style="font-size:15px;font-weight:600;color:var(--accent2)">${fxLabel}</div>
+      ${valorARS !== null
+                        ? `<div style="font-size:11px;color:var(--muted)">≈ ${fmt(valorARS)} ARS</div>`
+                        : `<div style="font-size:11px;color:var(--muted)">${state.cotizProxyUrl ? 'Cargando...' : 'Configurá cotizaciones en ⚙️'}</div>`
+                    }
+    </div>`;
+
+                if (cotizTxt) {
+                    extraInfo = `<div style="width:100%;padding:6px 4px 0;font-size:11px;color:var(--muted)" onclick="event.stopPropagation()">
+        ${cotizTxt}
+        <button onclick="event.stopPropagation();fetchCotizaciones()" style="background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;padding:0;margin-left:6px">↻ actualizar</button>
+      </div>`;
+                }
+            } else {
+                saldoDisplay = `<div class="cuenta-saldo ${saldo >= 0 ? 'pos' : 'neg'}">${saldo >= 0 ? '' : '-'}${fmt(saldo)}</div>`;
+            }
+
             return `
   <div class="cuenta-row" onclick="editCuenta('${c.id}')" style="flex-wrap:wrap">
     <div class="cuenta-icon" style="background:var(--surface2)">${info.icon}</div>
@@ -2132,8 +2214,9 @@
       <div class="cuenta-name">${c.nombre}</div>
       <div class="cuenta-type">${info.label}</div>
     </div>
-    <div class="cuenta-saldo ${saldo >= 0 ? 'pos' : 'neg'}">${saldo >= 0 ? '' : '-'}${fmt(saldo)}</div>
+    ${saldoDisplay}
     <button class="cuenta-delete" onclick="event.stopPropagation();deleteCuenta('${c.id}')">🗑</button>
+    ${extraInfo}
     ${yearBreakdown ? `<div style="width:100%;padding-top:8px;border-top:1px solid var(--border);margin-top:8px" onclick="event.stopPropagation()">${yearBreakdown}</div>` : ''}
   </div>`;
         }
@@ -2147,6 +2230,8 @@
             document.getElementById('txConcepto').value = '';
             document.getElementById('txMonto').value = '';
             document.getElementById('txCategoria').value = '';
+            document.getElementById('txMontoUSD').value = '';
+            document.getElementById('grupUSD').style.display = 'none';
             // Default fecha = hoy
             const hoy = new Date();
             const yyyy = hoy.getFullYear();
@@ -2170,6 +2255,11 @@
             document.getElementById('txMonto').value = t.monto;
             document.getElementById('txCuenta').value = t.cuentaId || '';
             document.getElementById('txCategoria').value = t.categoria || '';
+            // USD field
+            const cuentaEsDolar = ['dolar', 'guarani', 'real'].includes(state.cuentas.find(c => c.id === t.cuentaId)?.tipo);
+            document.getElementById('grupUSD').style.display = cuentaEsDolar ? 'block' : 'none';
+            document.getElementById('txMontoUSD').value = t.montoUSD || '';
+            if (cuentaEsDolar) updateUSDConvInfo(state.cuentas.find(c => c.id === t.cuentaId)?.tipo);
             // Fecha
             const d = new Date(t.date);
             const yyyy = d.getFullYear();
@@ -2214,6 +2304,9 @@
       <option value="banco">🏦 Banco</option>
       <option value="cripto">🪙 Criptomonedas</option>
       <option value="efectivo">💵 Efectivo / Dinero</option>
+      <option value="dolar">🇺🇸 Dólares (USD)</option>
+      <option value="guarani">🇵🇾 Guaraníes (PYG)</option>
+      <option value="real">🇧🇷 Reales (BRL)</option>
       <option value="bolsa">📈 Inversiones Bolsa</option>
       <option value="plazo_fijo">🏛 Plazo Fijo</option>
       <option value="otro">📦 Otro</option>
@@ -2275,13 +2368,13 @@
             const cuentaId = document.getElementById('txCuenta').value;
             const categoria = document.getElementById('txCategoria').value;
             const fechaVal = document.getElementById('txFecha').value;
+            const montoUSD = parseFloat(document.getElementById('txMontoUSD').value) || null;
 
             if (!concepto || isNaN(monto) || monto <= 0) {
                 alert('Por favor completá concepto y monto válido.');
                 return;
             }
 
-            // Construir fecha desde el campo — si no hay valor, usar hoy
             let txDate;
             if (fechaVal) {
                 const [y, m, d] = fechaVal.split('-').map(Number);
@@ -2298,6 +2391,7 @@
                     state.transactions[idx] = {
                         ...state.transactions[idx],
                         type: state.txType, concepto, monto, cuentaId, categoria,
+                        montoUSD: montoUSD || state.transactions[idx].montoUSD || null,
                         date: txDate,
                         attachment: pendingFile || state.transactions[idx].attachment || null
                     };
@@ -2305,6 +2399,7 @@
             } else {
                 state.transactions.push({
                     id: uid(), type: state.txType, concepto, monto, cuentaId, categoria,
+                    montoUSD,
                     attachment: pendingFile || null,
                     date: txDate
                 });
@@ -2394,6 +2489,86 @@
             renderResumen();
             renderCuentas();
             renderAlertas();
+        }
+
+        // ========== COTIZACIONES ==========
+        let dolarOficial = null;
+        let cotizaciones = { usd: null, pyg: null, brl: null };
+
+        async function fetchCotizaciones() {
+            if (!state.cotizProxyUrl) return;
+            try {
+                const r = await fetch(state.cotizProxyUrl);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const d = await r.json();
+                if (d.usd) {
+                    dolarOficial = { compra: d.usd.compra, venta: d.usd.venta };
+                    cotizaciones.usd = d.usd;
+                }
+                if (d.pyg) cotizaciones.pyg = d.pyg;
+                if (d.brl) cotizaciones.brl = d.brl;
+                renderCuentas();
+            } catch (e) {
+                console.warn('No se pudo obtener cotizaciones:', e.message);
+            }
+        }
+
+        // Mantener fetchDolar como alias para compatibilidad
+        function fetchDolar() { return fetchCotizaciones(); }
+
+        function onCuentaChange() {
+            const sel = document.getElementById('txCuenta');
+            const cuenta = state.cuentas.find(c => c.id === sel.value);
+            const esFX = cuenta && ['dolar', 'guarani', 'real'].includes(cuenta.tipo);
+            document.getElementById('grupUSD').style.display = esFX ? 'block' : 'none';
+            const labels = { dolar: '💵 Monto en dólares (USD)', guarani: '₲ Monto en guaraníes (PYG)', real: 'R$ Monto en reales (BRL)' };
+            if (esFX) {
+                document.querySelector('#grupUSD label').textContent = labels[cuenta.tipo] || '💱 Monto en moneda extranjera';
+                updateUSDConvInfo(cuenta.tipo);
+                document.getElementById('txMontoUSD').focus();
+            } else {
+                document.getElementById('txMontoUSD').value = '';
+            }
+        }
+
+        function updateUSDConvInfo(tipo) {
+            const info = document.getElementById('usdConvInfo');
+            const cotiz = tipo === 'dolar' ? cotizaciones.usd : tipo === 'guarani' ? cotizaciones.pyg : cotizaciones.brl;
+            if (cotiz) {
+                if (tipo === 'dolar') info.textContent = `Oficial BN: compra $${cotiz.compra.toLocaleString('es-AR')} / venta $${cotiz.venta.toLocaleString('es-AR')}`;
+                else if (tipo === 'guarani') info.textContent = `1 ₲ = $${cotiz.arsPerPYG.toFixed(4)} ARS`;
+                else if (tipo === 'real') info.textContent = `1 R$ = $${cotiz.arsPerBRL.toFixed(2)} ARS`;
+            } else {
+                info.textContent = state.cotizProxyUrl ? 'Obteniendo cotización...' : '⚙️ Configurá la URL de cotizaciones en Ajustes';
+                if (state.cotizProxyUrl) fetchCotizaciones().then(() => updateUSDConvInfo(tipo));
+            }
+        }
+
+        function convertUSDtoARS() {
+            const fx = parseFloat(document.getElementById('txMontoUSD').value) || 0;
+            if (!fx) return;
+            const sel = document.getElementById('txCuenta');
+            const cuenta = state.cuentas.find(c => c.id === sel.value);
+            if (!cuenta) return;
+            let rate = null, symbol = '';
+            if (cuenta.tipo === 'dolar' && cotizaciones.usd) { rate = cotizaciones.usd.venta; symbol = 'USD'; }
+            else if (cuenta.tipo === 'guarani' && cotizaciones.pyg) { rate = cotizaciones.pyg.arsPerPYG; symbol = '₲'; }
+            else if (cuenta.tipo === 'real' && cotizaciones.brl) { rate = cotizaciones.brl.arsPerBRL; symbol = 'R$'; }
+            if (rate) {
+                document.getElementById('txMonto').value = (fx * rate).toFixed(2);
+                document.getElementById('usdConvInfo').textContent =
+                    `${symbol} ${fx} × $${rate.toLocaleString('es-AR')} = $${(fx * rate).toLocaleString('es-AR', { minimumFractionDigits: 2 })} ARS`;
+            }
+        }
+
+        // Calcular nominal USD de una cuenta dolar
+        function calcNominalUSD(cuenta) {
+            // Sumar todas las txs en USD guardadas, o dividir por cotización histórica
+            const txs = state.transactions.filter(t => t.cuentaId === cuenta.id);
+            return txs.reduce((sum, t) => {
+                const usd = t.montoUSD || 0;
+                return sum + (t.type === 'income' ? usd : -usd);
+            }, cuenta.saldoInicialUSD || 0);
         }
 
         // ========== ALERTAS ==========
@@ -2522,7 +2697,7 @@
         // ========== INIT ==========
         loadState();
         render();
-        // Scroll mes actual al centro
+        fetchDolar(); // Obtener cotización al arrancar
         setTimeout(() => {
             const active = document.querySelector('.month-chip.active');
             if (active) active.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
