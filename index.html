@@ -399,7 +399,14 @@
             display: flex;
             gap: 8px;
             margin-bottom: 16px;
-            flex-wrap: wrap;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .resumen-filter::-webkit-scrollbar {
+            display: none;
         }
 
         .rf-btn {
@@ -412,6 +419,8 @@
             cursor: pointer;
             transition: all .2s;
             font-family: 'DM Sans', sans-serif;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .rf-btn.active {
@@ -1101,6 +1110,9 @@
                 <button class="rf-btn active" onclick="setResumenFilter('mes',this)">Por Mes</button>
                 <button class="rf-btn" onclick="setResumenFilter('anio',this)">Por Año</button>
                 <button class="rf-btn" onclick="setResumenFilter('dia',this)">Por Día</button>
+                <button class="rf-btn" onclick="setResumenFilter('gastos',this)">📉 Gastos</button>
+                <button class="rf-btn" onclick="setResumenFilter('ingresos',this)">📈 Ingresos</button>
+                <button class="rf-btn" onclick="setResumenFilter('torta',this)">🥧 Torta</button>
             </div>
             <div id="resumenContent"></div>
         </div>
@@ -1138,13 +1150,13 @@
 
     <!-- BOTTOM NAV -->
     <nav class="nav">
-        <button class="nav-btn active" id="nav-inicio" onclick="switchTab('inicio')">
+        <button class="nav-btn" id="nav-alertas" onclick="switchTab('alertas')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
                 stroke-linejoin="round">
-                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
-                <path d="M9 21V12h6v9" />
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 01-3.46 0" />
             </svg>
-            Inicio
+            Alertas
         </button>
         <button class="nav-btn" id="nav-resumen" onclick="switchTab('resumen')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
@@ -1156,6 +1168,14 @@
                 <polyline points="10,9 9,9 8,9" />
             </svg>
             Resumen
+        </button>
+        <button class="nav-btn active" id="nav-inicio" onclick="switchTab('inicio')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
+                <path d="M9 21V12h6v9" />
+            </svg>
+            Inicio
         </button>
         <button class="nav-btn" id="nav-ingresos" onclick="switchTab('ingresos')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
@@ -1174,14 +1194,6 @@
                 <line x1="5" y1="5" x2="19" y2="5" />
             </svg>
             Gastos
-        </button>
-        <button class="nav-btn" id="nav-alertas" onclick="switchTab('alertas')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-                stroke-linejoin="round">
-                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 01-3.46 0" />
-            </svg>
-            Alertas
         </button>
     </nav>
 
@@ -1708,16 +1720,28 @@
             }
             el.innerHTML = txs.sort((a, b) => new Date(b.date) - new Date(a.date)).map(t => {
                 const cuenta = state.cuentas.find(c => c.id === t.cuentaId);
+                // Para gastos: mostrar cuenta de gasto. Para ingresos: mostrar cuenta de ingreso
+                // Si tiene cuenta, mostrarla. Si tiene categoría adicional, mostrarla también
+                const cuentaInfo = cuenta ? `${TIPO_INFO[cuenta.tipo]?.icon || ''} ${cuenta.nombre}` : null;
                 const catInfo = t.categoria ? TIPO_INFO[t.categoria] : null;
-                const subLine = [
-                    cuenta ? `${TIPO_INFO[cuenta.tipo]?.icon || ''} ${cuenta.nombre}` : null,
-                    catInfo ? `${catInfo.icon} ${catInfo.label}` : null
-                ].filter(Boolean).join(' · ');
-                const attachBadge = t.attachment
-                    ? `<div class="tx-attach-badge" onclick="event.stopPropagation();openViewer('${t.id}')">📎 ${t.attachment.name.length > 18 ? t.attachment.name.slice(0, 18) + '…' : t.attachment.name}</div>`
-                    : '';
+                // Para gastos con cuenta de gasto, no mostrar categoría redundante
+                const showCat = catInfo && !(cuenta && cuenta.tipo.startsWith('gasto_'));
+                const subLine = [cuentaInfo, showCat ? `${catInfo.icon} ${catInfo.label}` : null].filter(Boolean).join(' · ');
                 const d = new Date(t.date);
                 const fechaTxt = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+                // Miniatura adjunto
+                let attachBadge = '';
+                if (t.attachment) {
+                    if (t.attachment.type && t.attachment.type.startsWith('image/') && t.attachment.dataUrl) {
+                        attachBadge = `<div class="tx-thumb" onclick="event.stopPropagation();openViewer('${t.id}')">
+          <img src="${t.attachment.dataUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" />
+        </div>`;
+                    } else {
+                        attachBadge = `<div class="tx-attach-badge" onclick="event.stopPropagation();openViewer('${t.id}')">📄 ${t.attachment.name.length > 18 ? t.attachment.name.slice(0, 18) + '…' : t.attachment.name}</div>`;
+                    }
+                }
+
                 return `
     <div class="tx-row" onclick="editTx('${t.id}')">
       <div class="tx-dot ${type}">${type === 'income' ? '▲' : '▼'}</div>
@@ -1751,10 +1775,143 @@
                 return;
             }
 
+            // ── TORTA ──
+            if (f === 'torta') {
+                const txsMes = getTxsForMonth(currentMonth, currentYear);
+                const totalIn = txsMes.filter(t => t.type === 'income').reduce((a, t) => a + t.monto, 0);
+                const totalOut = txsMes.filter(t => t.type === 'expense').reduce((a, t) => a + t.monto, 0);
+                const total = totalIn + totalOut || 1;
+                const pIn = (totalIn / total * 100).toFixed(1);
+                const pOut = (totalOut / total * 100).toFixed(1);
+                // SVG donut
+                const r = 70, cx = 90, cy = 90, circum = 2 * Math.PI * r;
+                const dashIn = (totalIn / total * circum).toFixed(2);
+                const dashOut = (totalOut / total * circum).toFixed(2);
+                const offsetOut = (- (totalIn / total * circum) + circum / 4).toFixed(2);
+
+                // Breakdown por cuenta de gasto
+                const gastosPorCuenta = {};
+                txsMes.filter(t => t.type === 'expense').forEach(t => {
+                    const c = cuentas.find(x => x.id === t.cuentaId);
+                    const label = c ? c.nombre : 'Sin cuenta';
+                    gastosPorCuenta[label] = (gastosPorCuenta[label] || 0) + t.monto;
+                });
+                const gastosSorted = Object.entries(gastosPorCuenta).sort((a, b) => b[1] - a[1]);
+                const colors = ['#c8f135', '#35f1a0', '#f1a035', '#f13535', '#357ef1', '#c335f1', '#35d4f1', '#f1e535'];
+
+                el.innerHTML = `
+    <div style="background:var(--surface);border-radius:16px;padding:16px;margin-bottom:12px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;text-align:center">${MONTHS[currentMonth]} ${currentYear}</div>
+      <svg viewBox="0 0 180 180" style="width:160px;display:block;margin:0 auto 16px">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface2)" stroke-width="22"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--accent2)" stroke-width="22"
+          stroke-dasharray="${dashIn} ${circum}" stroke-dashoffset="${(circum / 4).toFixed(2)}" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--red)" stroke-width="22"
+          stroke-dasharray="${dashOut} ${circum}" stroke-dashoffset="${offsetOut}" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>
+        <text x="${cx}" y="${cy - 8}" text-anchor="middle" font-size="13" fill="var(--muted)" font-family="DM Sans">Balance</text>
+        <text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="14" fill="${totalIn >= totalOut ? 'var(--accent2)' : 'var(--red)'}" font-weight="600" font-family="DM Sans">${totalIn >= totalOut ? '+' : ''}${fmt(totalIn - totalOut)}</text>
+      </svg>
+      <div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;border-radius:50%;background:var(--accent2)"></div><span style="font-size:12px;color:var(--muted)">Ingresos ${pIn}%</span></div>
+        <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;border-radius:50%;background:var(--red)"></div><span style="font-size:12px;color:var(--muted)">Gastos ${pOut}%</span></div>
+      </div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Detalle gastos</div>
+      ${gastosSorted.length === 0 ? '<div style="color:var(--muted);font-size:13px;text-align:center">Sin gastos este mes</div>' :
+                        gastosSorted.map(([label, monto], i) => {
+                            const pct = totalOut > 0 ? (monto / totalOut * 100).toFixed(1) : 0;
+                            const color = colors[i % colors.length];
+                            return `<div style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <span style="font-size:12px;color:var(--text)">${label}</span>
+              <span style="font-size:12px;color:var(--red)">-${fmt(monto)} <span style="color:var(--muted)">(${pct}%)</span></span>
+            </div>
+            <div style="background:var(--surface2);border-radius:4px;height:6px">
+              <div style="background:${color};height:6px;border-radius:4px;width:${pct}%"></div>
+            </div>
+          </div>`;
+                        }).join('')
+                    }
+    </div>`;
+                return;
+            }
+
+            // ── RESUMEN GASTOS ──
+            if (f === 'gastos') {
+                const txsMes = getTxsForMonth(currentMonth, currentYear).filter(t => t.type === 'expense');
+                const total = txsMes.reduce((a, t) => a + t.monto, 0);
+                if (txsMes.length === 0) { el.innerHTML = '<div class="empty"><div>Sin gastos este mes</div></div>'; return; }
+                const porCuenta = {};
+                txsMes.forEach(t => {
+                    const c = cuentas.find(x => x.id === t.cuentaId);
+                    const label = c ? `${TIPO_INFO[c.tipo]?.icon || ''} ${c.nombre}` : '📦 Sin cuenta';
+                    if (!porCuenta[label]) porCuenta[label] = { monto: 0, txs: [] };
+                    porCuenta[label].monto += t.monto;
+                    porCuenta[label].txs.push(t);
+                });
+                const sorted = Object.entries(porCuenta).sort((a, b) => b[1].monto - a[1].monto);
+                el.innerHTML = `
+    <div style="background:var(--surface);border-radius:16px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+        <span style="font-size:13px;color:var(--muted)">Total gastos ${MONTHS[currentMonth]}</span>
+        <span style="font-size:15px;font-weight:600;color:var(--red)">-${fmt(total)}</span>
+      </div>
+      ${sorted.map(([label, data]) => {
+                    const pct = (data.monto / total * 100).toFixed(1);
+                    return `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="font-size:13px;color:var(--text)">${label}</span>
+            <span style="font-size:13px;color:var(--red)">-${fmt(data.monto)} <span style="color:var(--muted);font-size:11px">${pct}%</span></span>
+          </div>
+          <div style="background:var(--surface2);border-radius:4px;height:5px">
+            <div style="background:var(--red);opacity:0.7;height:5px;border-radius:4px;width:${pct}%"></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${data.txs.length} movimiento${data.txs.length !== 1 ? 's' : ''}</div>
+        </div>`;
+                }).join('')}
+    </div>`;
+                return;
+            }
+
+            // ── RESUMEN INGRESOS ──
+            if (f === 'ingresos') {
+                const txsMes = getTxsForMonth(currentMonth, currentYear).filter(t => t.type === 'income');
+                const total = txsMes.reduce((a, t) => a + t.monto, 0);
+                if (txsMes.length === 0) { el.innerHTML = '<div class="empty"><div>Sin ingresos este mes</div></div>'; return; }
+                const porCuenta = {};
+                txsMes.forEach(t => {
+                    const c = cuentas.find(x => x.id === t.cuentaId);
+                    const label = c ? `${TIPO_INFO[c.tipo]?.icon || ''} ${c.nombre}` : '📦 Sin cuenta';
+                    if (!porCuenta[label]) porCuenta[label] = { monto: 0, txs: [] };
+                    porCuenta[label].monto += t.monto;
+                    porCuenta[label].txs.push(t);
+                });
+                const sorted = Object.entries(porCuenta).sort((a, b) => b[1].monto - a[1].monto);
+                el.innerHTML = `
+    <div style="background:var(--surface);border-radius:16px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+        <span style="font-size:13px;color:var(--muted)">Total ingresos ${MONTHS[currentMonth]}</span>
+        <span style="font-size:15px;font-weight:600;color:var(--accent2)">+${fmt(total)}</span>
+      </div>
+      ${sorted.map(([label, data]) => {
+                    const pct = (data.monto / total * 100).toFixed(1);
+                    return `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="font-size:13px;color:var(--text)">${label}</span>
+            <span style="font-size:13px;color:var(--accent2)">+${fmt(data.monto)} <span style="color:var(--muted);font-size:11px">${pct}%</span></span>
+          </div>
+          <div style="background:var(--surface2);border-radius:4px;height:5px">
+            <div style="background:var(--accent2);opacity:0.7;height:5px;border-radius:4px;width:${pct}%"></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${data.txs.length} movimiento${data.txs.length !== 1 ? 's' : ''}</div>
+        </div>`;
+                }).join('')}
+    </div>`;
+                return;
+            }
+
             let groups = {};
 
             if (f === 'anio') {
-                // Agrupar por año
                 transactions.forEach(t => {
                     const y = new Date(t.date).getFullYear();
                     if (!groups[y]) groups[y] = { income: 0, expense: 0, txs: 0 };
@@ -1765,7 +1922,6 @@
                 el.innerHTML = Object.keys(groups).sort((a, b) => b - a).map(k => renderResumenCard(k, groups[k])).join('') || '<div class="empty"><div>Sin datos</div></div>';
 
             } else if (f === 'mes') {
-                // Agrupar por mes del año actual
                 for (let m = 0; m < 12; m++) {
                     const txs = getTxsForMonth(m, currentYear);
                     if (txs.length > 0) {
@@ -1781,7 +1937,6 @@
                     : '<div class="empty"><div>Sin movimientos en ' + currentYear + '</div></div>';
 
             } else {
-                // Agrupar por día del mes actual
                 getTxsForMonth(currentMonth, currentYear).forEach(t => {
                     const d = new Date(t.date);
                     const key = d.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short' });
