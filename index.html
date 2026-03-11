@@ -3562,13 +3562,20 @@
             const trigEl = document.getElementById('alertasTriggeradas');
             if (!el) return;
 
+            // Colores por importancia
+            const IMP = {
+                alta: { color: '#ff5e5e', bg: 'rgba(255,94,94,.15)', border: 'rgba(255,94,94,.4)', label: '🔴 Alta' },
+                media: { color: '#f1a035', bg: 'rgba(241,160,53,.15)', border: 'rgba(241,160,53,.4)', label: '🟡 Media' },
+                baja: { color: '#35f1a0', bg: 'rgba(53,241,160,.15)', border: 'rgba(53,241,160,.4)', label: '🟢 Baja' },
+            };
+            const getImp = a => IMP[a.importancia] || IMP.media;
+
             // Verificar alertas disparadas
             const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
             const disparadas = [];
 
             state.alertas.forEach(a => {
                 if (!a.activa) return;
-                // Alerta por saldo bajo
                 if (a.cuentaId && a.umbral !== null) {
                     const cuenta = state.cuentas.find(c => c.id === a.cuentaId);
                     if (cuenta) {
@@ -3576,44 +3583,64 @@
                         if (saldo <= a.umbral) disparadas.push({ a, motivo: `💰 Saldo de ${cuenta.nombre}: ${fmt(saldo)} (límite: ${fmt(a.umbral)})` });
                     }
                 }
-                // Alerta por fecha
                 if (a.fecha) {
                     const fAlerta = new Date(a.fecha + 'T00:00:00');
-                    if (fAlerta <= hoy) disparadas.push({ a, motivo: `📅 Fecha de alerta: ${a.fecha.split('-').reverse().join('/')}` });
+                    if (fAlerta <= hoy) disparadas.push({ a, motivo: `📅 Fecha: ${a.fecha.split('-').reverse().join('/')}` });
                 }
             });
 
-            // Mostrar alertas disparadas arriba en rojo
-            trigEl.innerHTML = disparadas.map(({ a, motivo }) => `
-    <div style="background:rgba(255,94,94,.1);border:1px solid rgba(255,94,94,.3);border-radius:12px;padding:12px 14px;margin-bottom:8px">
-      <div style="font-size:13px;font-weight:600;color:var(--red)">⚠️ ${a.desc}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px">${motivo}</div>
-    </div>`).join('');
+            trigEl.innerHTML = disparadas.map(({ a, motivo }) => {
+                const imp = getImp(a);
+                return `<div style="background:rgba(255,94,94,.1);border:1px solid ${imp.border};border-left:3px solid ${imp.color};border-radius:12px;padding:12px 14px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-size:13px;font-weight:700;color:${imp.color}">⚠️ ${a.desc}</span>
+        <span style="font-size:10px;background:${imp.bg};color:${imp.color};padding:2px 7px;border-radius:6px;font-weight:600">${imp.label}</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted)">${motivo}</div>
+    </div>`;
+            }).join('');
 
             if (state.alertas.length === 0) {
                 el.innerHTML = `<div class="empty"><div style="font-size:32px;margin-bottom:8px">🔔</div><div>Sin alertas. Creá una con + Alerta</div></div>`;
                 return;
             }
 
-            el.innerHTML = state.alertas.map(a => {
+            // Ordenar: Alta → Media → Baja, y dentro activas primero
+            const impOrder = { alta: 0, media: 1, baja: 2 };
+            const sorted = [...state.alertas].sort((a, b) => {
+                const ao = impOrder[a.importancia] ?? 1;
+                const bo = impOrder[b.importancia] ?? 1;
+                if (ao !== bo) return ao - bo;
+                return (b.activa ? 1 : 0) - (a.activa ? 1 : 0);
+            });
+
+            el.innerHTML = sorted.map(a => {
+                const imp = getImp(a);
                 const cuenta = a.cuentaId ? state.cuentas.find(c => c.id === a.cuentaId) : null;
                 const detalle = [
                     cuenta ? `${TIPO_INFO[cuenta.tipo]?.icon || ''} ${cuenta.nombre}` : null,
                     a.umbral !== null ? `Aviso al bajar de ${fmt(a.umbral)}` : null,
                     a.fecha ? `📅 ${a.fecha.split('-').reverse().join('/')}` : null
                 ].filter(Boolean).join(' · ');
+
+                const dotColor = a.activa ? imp.color : 'var(--muted)';
+                const dotBg = a.activa ? imp.bg : 'rgba(122,126,148,.1)';
+                const cardBorder = a.activa ? imp.border : 'var(--border)';
+                const cardBorderLeft = a.activa ? `3px solid ${imp.color}` : `1px solid var(--border)`;
+
                 return `
-    <div class="tx-row" onclick="editAlerta('${a.id}')" style="opacity:${a.activa ? 1 : 0.45}">
-      <div class="tx-dot" style="background:${a.activa ? 'rgba(200,241,53,.15)' : 'rgba(122,126,148,.1)'};color:${a.activa ? 'var(--accent)' : 'var(--muted)'};font-size:16px;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center">🔔</div>
-      <div class="tx-info">
-        <div class="tx-concept">${a.desc}</div>
-        <div class="tx-desc">${detalle || 'Recordatorio manual'}</div>
+    <div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface);border:1px solid ${cardBorder};border-left:${cardBorderLeft};border-radius:14px;margin-bottom:10px;cursor:pointer;opacity:${a.activa ? 1 : 0.5};transition:all .2s" onclick="editAlerta('${a.id}')">
+      <div style="width:40px;height:40px;border-radius:50%;background:${dotBg};border:2px solid ${dotColor};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🔔</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.desc}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:6px">
+          <span style="color:${dotColor};font-weight:600;font-size:10px;background:${dotBg};padding:1px 6px;border-radius:5px">${imp.label}</span>
+          ${detalle ? `<span>${detalle}</span>` : '<span>Recordatorio manual</span>'}
+        </div>
       </div>
-      <div class="tx-right">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation()">
-          <input type="checkbox" ${a.activa ? 'checked' : ''} onchange="toggleAlerta('${a.id}')" style="accent-color:var(--accent);width:16px;height:16px">
-        </label>
-      </div>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-shrink:0" onclick="event.stopPropagation()">
+        <input type="checkbox" ${a.activa ? 'checked' : ''} onchange="toggleAlerta('${a.id}')" style="accent-color:${imp.color};width:18px;height:18px">
+      </label>
     </div>`;
             }).join('');
         }
