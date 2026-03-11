@@ -2662,10 +2662,10 @@
                     if (t.cuentaId !== cuenta.id) return sum;
                     return sum + (t.transferRole === 'in' ? t.monto : -t.monto);
                 }
-                // Gastos con origen: descuenta del origen, no de la cuenta de gasto
+                // Gastos con origen: descuenta del origen Y acumula en la cuenta de gasto
                 if (t.type === 'expense' && t.origenId) {
-                    if (t.cuentaId === cuenta.id) return sum;
-                    if (t.origenId === cuenta.id) return sum - t.monto;
+                    if (t.cuentaId === cuenta.id) return sum - t.monto; // cuenta de gasto: acumula historial
+                    if (t.origenId === cuenta.id) return sum - t.monto; // cuenta origen: descuenta saldo real
                     return sum;
                 }
                 // Ingresos y gastos sin origen
