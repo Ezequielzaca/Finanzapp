@@ -1612,7 +1612,8 @@
                         <div class="type-btn" id="btnExpense" onclick="setTxType('expense')">▼ Gasto</div>
                         <div class="type-btn" id="btnTransfer" onclick="setTxType('transfer')"
                             style="flex:1;background:rgba(100,180,255,.08);color:#64b4ff;border:1px solid rgba(100,180,255,.25)">
-                            ⇄ Transferencia</div>
+                            ⇄
+                            Transferencia</div>
                     </div>
                 </div>
                 <div class="form-group">
@@ -1624,7 +1625,8 @@
                 <div id="grupCuentaNormal">
                     <div class="form-group">
                         <label id="txCuentaLabel">Cuenta de gasto <span
-                                style="color:var(--muted);font-size:11px">(Tenis, Netflix...)</span></label>
+                                style="color:var(--muted);font-size:11px">(Tenis,
+                                Netflix...)</span></label>
                         <select id="txCuenta" onchange="onCuentaChange()"></select>
                     </div>
                     <!-- Cuenta origen: solo visible en gastos -->
@@ -1639,16 +1641,18 @@
                 <div id="grupTransfer" style="display:none">
                     <div class="form-group">
                         <label>Desde <span style="color:var(--muted);font-size:11px">(cuenta origen)</span></label>
-                        <select id="txTransferOrigen"></select>
+                        <select id="txTransferOrigen" onchange="checkTransferFX()"></select>
                     </div>
                     <div class="form-group">
                         <label>Hacia <span style="color:var(--muted);font-size:11px">(cuenta destino)</span></label>
-                        <select id="txTransferDestino"></select>
+                        <select id="txTransferDestino" onchange="checkTransferFX()"></select>
                     </div>
                 </div>
                 <!-- Campo USD - solo visible cuando la cuenta es dólar -->
                 <div class="form-group" id="grupUSD" style="display:none">
-                    <label>💵 Monto en dólares (USD)</label>
+                    <label>💵 Monto en dólares (USD) <span style="color:var(--muted);font-size:11px"
+                            id="usdOptLabel">(opcional —
+                            se calcula automático)</span></label>
                     <input id="txMontoUSD" type="number" placeholder="100.00" min="0" step="0.01"
                         oninput="convertUSDtoARS()" />
                     <div id="usdConvInfo" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
@@ -1689,7 +1693,8 @@
                 </div>
                 <button class="submit-btn" onclick="saveTx()">Guardar</button>
                 <button class="modal-delete-btn" id="txDeleteBtn" onclick="deleteTxFromModal()" style="display:none">🗑
-                    Eliminar movimiento</button>
+                    Eliminar
+                    movimiento</button>
             </div>
         </div>
     </div>
@@ -1742,7 +1747,8 @@
                 </div>
                 <button class="submit-btn" onclick="saveCuenta()">Guardar Cuenta</button>
                 <button class="modal-delete-btn" id="cuentaDeleteBtn" onclick="deleteCuentaFromModal()"
-                    style="display:none">🗑 Eliminar cuenta</button>
+                    style="display:none">🗑
+                    Eliminar cuenta</button>
             </div>
         </div>
     </div>
@@ -1761,7 +1767,8 @@
                     style="background:rgba(200,241,53,.07);border:1px solid rgba(200,241,53,.2);border-radius:12px;padding:14px;margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.6">
                     <b style="color:var(--accent)">☁️ Google Drive automático</b><br>
                     Pegá aquí la URL de tu Google Apps Script para subir comprobantes directamente a tu Drive organizado
-                    por carpetas.
+                    por
+                    carpetas.
                     <br><br>
                     <span style="color:var(--text)">📁 Estructura:</span> <code
                         style="color:var(--accent2)">Ingresos/2026/03_Marzo/SueldoTelco.pdf</code>
@@ -1782,7 +1789,8 @@
                         style="background:rgba(53,241,160,.07);border:1px solid rgba(53,241,160,.2);border-radius:12px;padding:14px;margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.6">
                         <b style="color:var(--accent2)">💱 Cotizaciones (USD / Guaraní / Real)</b><br>
                         Pegá aquí la URL de tu Apps Script de cotizaciones para ver precios actualizados en tus cuentas
-                        en moneda extranjera.
+                        en moneda
+                        extranjera.
                     </div>
                     <div class="form-group">
                         <label>URL del Script de Cotizaciones</label>
@@ -1873,12 +1881,14 @@
                 </div>
                 <div class="form-group">
                     <label>Fecha de aviso <span style="color:var(--muted);font-size:11px">(opcional, para recordatorios
-                            de fecha)</span></label>
+                            de
+                            fecha)</span></label>
                     <input id="alertaFecha" type="date" />
                 </div>
                 <button class="submit-btn" onclick="saveAlerta()">Guardar Alerta</button>
                 <button class="modal-delete-btn" id="alertaDeleteBtn" onclick="deleteAlertaFromModal()"
-                    style="display:none">🗑 Eliminar alerta</button>
+                    style="display:none">🗑
+                    Eliminar alerta</button>
             </div>
         </div>
     </div>
@@ -2939,10 +2949,11 @@
             if (t.attachment) { pendingFile = t.attachment; showAttachPreview(t.attachment); }
 
             if (t.type === 'transfer') {
-                // Encontrar el par destino
                 const destinoT = state.transactions.find(x => x.transferId === t.transferId && x.transferRole === 'in');
                 document.getElementById('txTransferOrigen').value = t.cuentaId || '';
                 document.getElementById('txTransferDestino').value = destinoT?.cuentaId || '';
+                checkTransferFX();
+                document.getElementById('txMontoUSD').value = t.montoUSD || '';
                 document.getElementById('txModal').classList.add('open');
                 return;
             }
@@ -3149,12 +3160,12 @@
             document.getElementById('grupCategoria').style.display = 'none';
 
             if (esTransfer) {
-                // Poblar ambos selectores con cuentas NO-gasto
                 const cuentas = state.cuentas.filter(c => !c.tipo.startsWith('gasto_'));
                 const opts = '<option value="">— Seleccionar —</option>' +
                     cuentas.map(c => `<option value="${c.id}">${TIPO_INFO[c.tipo]?.icon || ''} ${c.nombre}</option>`).join('');
                 document.getElementById('txTransferOrigen').innerHTML = opts;
                 document.getElementById('txTransferDestino').innerHTML = opts;
+                checkTransferFX();
             } else {
                 populateCuentaSelect();
             }
@@ -3241,8 +3252,24 @@
                 if (origenId === destinoId) { alert('Origen y destino no pueden ser la misma cuenta.'); return; }
 
                 const txBase = { concepto, monto, date: txDate, type: 'transfer', attachment: pendingFile || null };
+
+                // Calcular montoUSD: campo manual o auto-calcular desde cotización
+                let montoUSDTransfer = parseFloat(document.getElementById('txMontoUSD').value) || null;
+                if (!montoUSDTransfer) {
+                    const cuentaOrigen = state.cuentas.find(c => c.id === origenId);
+                    const cuentaDestino = state.cuentas.find(c => c.id === destinoId);
+                    const fxCuenta = [cuentaOrigen, cuentaDestino].find(c => c && ['dolar', 'guarani', 'real'].includes(c.tipo));
+                    if (fxCuenta) {
+                        let rate = null;
+                        if (fxCuenta.tipo === 'dolar' && cotizaciones.usd) rate = cotizaciones.usd.venta;
+                        if (fxCuenta.tipo === 'guarani' && cotizaciones.pyg) rate = cotizaciones.pyg.arsPerPYG;
+                        if (fxCuenta.tipo === 'real' && cotizaciones.brl) rate = cotizaciones.brl.arsPerBRL;
+                        if (rate && rate > 0) montoUSDTransfer = monto / rate;
+                    }
+                }
+                if (montoUSDTransfer) txBase.montoUSD = montoUSDTransfer;
+
                 if (state.editingTxId) {
-                    // Al editar una transferencia, actualizamos el par buscando por transferId
                     const t = state.transactions.find(x => x.id === state.editingTxId);
                     const transferId = t?.transferId || state.editingTxId;
                     state.transactions = state.transactions.filter(x => x.transferId !== transferId && x.id !== state.editingTxId);
@@ -3371,6 +3398,9 @@
             document.getElementById('tab-' + tab).classList.add('active');
             document.getElementById('nav-' + tab).classList.add('active');
             state.activeTab = tab;
+            // FAB solo en inicio
+            const fab = document.querySelector('.fab');
+            if (fab) fab.style.display = tab === 'inicio' ? 'flex' : 'none';
             // Si volvés a resumen, mostrar la grilla de inicio
             if (tab === 'resumen') {
                 state.resumenFilter = null;
@@ -3449,6 +3479,25 @@
             }
         }
 
+        function checkTransferFX() {
+            const origenId = document.getElementById('txTransferOrigen').value;
+            const destinoId = document.getElementById('txTransferDestino').value;
+            const fxTypes = ['dolar', 'guarani', 'real'];
+            const cuentaOrigen = state.cuentas.find(c => c.id === origenId);
+            const cuentaDestino = state.cuentas.find(c => c.id === destinoId);
+            const fxCuenta = [cuentaOrigen, cuentaDestino].find(c => c && fxTypes.includes(c.tipo));
+
+            const grupUSD = document.getElementById('grupUSD');
+            if (fxCuenta) {
+                grupUSD.style.display = 'block';
+                const labels = { dolar: '💵 Monto en dólares (USD)', guarani: '🇵🇾 Monto en guaraníes (₲)', real: '🇧🇷 Monto en reales (R$)' };
+                document.querySelector('#grupUSD label').textContent = labels[fxCuenta.tipo] || '💱 Monto en moneda extranjera';
+            } else {
+                grupUSD.style.display = 'none';
+                document.getElementById('txMontoUSD').value = '';
+            }
+        }
+
         function convertUSDtoARS() {
             const fx = parseFloat(document.getElementById('txMontoUSD').value) || 0;
             if (!fx) return;
@@ -3468,11 +3517,15 @@
 
         // Calcular nominal USD de una cuenta dolar
         function calcNominalUSD(cuenta) {
-            // Sumar todas las txs en USD guardadas, o dividir por cotización histórica
             const txs = state.transactions.filter(t => t.cuentaId === cuenta.id);
             return txs.reduce((sum, t) => {
                 const usd = t.montoUSD || 0;
-                return sum + (t.type === 'income' ? usd : -usd);
+                if (t.type === 'income') return sum + usd;
+                if (t.type === 'expense') return sum - usd;
+                if (t.type === 'transfer') {
+                    return sum + (t.transferRole === 'in' ? usd : -usd);
+                }
+                return sum;
             }, cuenta.saldoInicialUSD || 0);
         }
 
