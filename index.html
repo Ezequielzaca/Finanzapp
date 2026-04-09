@@ -1541,6 +1541,7 @@
         <div class="page" id="pg-cuadros">
             <div class="slbl">Cuadros por Categoría</div>
             <div class="ctabs" id="cTabs"></div>
+            <div class="ctabs" id="cGrpTabs" style="margin-top:-10px"></div>
             <div id="cGrid"></div>
         </div>
 
@@ -1908,45 +1909,73 @@
         }
 
         // ═══ CUADROS ═══
+        var selGrp = null; // null=all groups, 'A','B','C','D'
         function rCTabs() {
             var t = document.getElementById('cTabs'); t.innerHTML = '';
             CATS.forEach(function (cat) {
                 var n = parts.filter(function (p) { return p.cat === cat }).length; if (!n) return;
                 t.innerHTML += '<div class="ct' + (selCat === cat ? ' a-' + CS[cat] : '') + '" onclick="togCat(\'' + cat + '\')">' + CL[cat] + ' (' + n + ')</div>';
             });
+            rCGrpTabs();
         }
-        function togCat(cat) { selCat = selCat === cat ? null : cat; rCTabs(); rGrid() }
+        function rCGrpTabs() {
+            var gt = document.getElementById('cGrpTabs'); gt.innerHTML = '';
+            if (!selCat) return;
+            var grps = ['General', 'A', 'B', 'C', 'D'];
+            grps.forEach(function (g) {
+                var val = g === 'General' ? null : g;
+                var isAct = selGrp === val;
+                var style = isAct ? 'background:var(--acc-d);color:var(--acc);border-color:var(--acc)' : '';
+                gt.innerHTML += '<div class="ct" style="' + style + '" onclick="setSelGrp(' + (val === null ? 'null' : "'" + val + "'") + ')">' + g + '</div>';
+            });
+        }
+        function togCat(cat) { selCat = selCat === cat ? null : cat; selGrp = null; rCTabs(); rGrid() }
+        function setSelGrp(g) { selGrp = g; rCGrpTabs(); rGrid() }
+
+        function buildGrid(players, title) {
+            if (!players.length) return '';
+            var rM = {}; results.filter(function (r) { return r.cat === selCat }).forEach(function (r) { rM[r.p1id + '_' + r.p2id] = r; rM[r.p2id + '_' + r.p1id] = { p1id: r.p2id, p2id: r.p1id, score: r.score, winner: r.winner, flip: true } });
+            var html = '<div class="slbl" style="margin-top:16px;margin-bottom:8px">' + title + '</div>';
+            html += '<div class="gw"><table class="gt"><thead><tr><th></th><th class="cn">#</th>';
+            players.forEach(function (_, i) { html += '<th class="cn">' + (i + 1) + '</th>' });
+            html += '</tr></thead><tbody>';
+            players.forEach(function (p, i) {
+                html += '<tr><td class="rn">' + p.apellido + ' ' + p.nombre + '</td><td class="cn">' + (i + 1) + '</td>';
+                players.forEach(function (q, j) {
+                    if (i === j) { html += '<td class="self">—</td>'; return }
+                    var k = p.id + '_' + q.id, r = rM[k];
+                    if (r) { var w = r.flip ? r.winner === 2 : r.winner === 1; html += '<td class="' + (w ? 'win' : 'loss') + '">' + r.score + '</td>' }
+                    else html += '<td></td>';
+                }); html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            return html;
+        }
+
         function rGrid() {
             var el = document.getElementById('cGrid');
             if (!selCat) { el.innerHTML = ''; return }
-            var groups = ['A', 'B', 'C', 'D'];
             var pl = parts.filter(function (p) { return p.cat === selCat });
             if (!pl.length) { el.innerHTML = '<div class="es"><div class="es-i">📋</div><div class="es-t">Sin participantes en ' + CL[selCat] + '</div></div>'; return }
-            var rM = {}; results.filter(function (r) { return r.cat === selCat }).forEach(function (r) { rM[r.p1id + '_' + r.p2id] = r; rM[r.p2id + '_' + r.p1id] = { p1id: r.p2id, p2id: r.p1id, score: r.score, winner: r.winner, flip: true } });
+
             var html = '';
-            groups.forEach(function (g) {
-                var gpl = pl.filter(function (p) { return p.grupo === g }).sort(function (a, b) { return (a.apellido + a.nombre).localeCompare(b.apellido + b.nombre) });
-                if (!gpl.length) return;
-                html += '<div class="slbl" style="margin-top:16px;margin-bottom:8px">Grupo ' + g + ' — ' + CL[selCat] + '</div>';
-                html += '<div class="gw"><table class="gt"><thead><tr><th></th><th class="cn">#</th>';
-                gpl.forEach(function (_, i) { html += '<th class="cn">' + (i + 1) + '</th>' });
-                html += '</tr></thead><tbody>';
-                gpl.forEach(function (p, i) {
-                    html += '<tr><td class="rn">' + p.apellido + ' ' + p.nombre + '</td><td class="cn">' + (i + 1) + '</td>';
-                    gpl.forEach(function (q, j) {
-                        if (i === j) { html += '<td class="self">—</td>'; return }
-                        var k = p.id + '_' + q.id, r = rM[k];
-                        if (r) { var w = r.flip ? r.winner === 2 : r.winner === 1; html += '<td class="' + (w ? 'win' : 'loss') + '">' + r.score + '</td>' }
-                        else html += '<td></td>';
-                    }); html += '</tr>';
+            if (selGrp === null) {
+                // General: show all groups
+                var groups = ['A', 'B', 'C', 'D'];
+                groups.forEach(function (g) {
+                    var gpl = pl.filter(function (p) { return p.grupo === g }).sort(function (a, b) { return (a.apellido + a.nombre).localeCompare(b.apellido + b.nombre) });
+                    html += buildGrid(gpl, 'Grupo ' + g + ' — ' + CL[selCat]);
                 });
-                html += '</tbody></table></div>';
-            });
-            // Players without group
-            var noG = pl.filter(function (p) { return !p.grupo || groups.indexOf(p.grupo) === -1 });
-            if (noG.length) {
-                html += '<div class="slbl" style="margin-top:16px;margin-bottom:8px;color:#f87171">Sin grupo asignado</div>';
-                noG.forEach(function (p) { html += '<div class="pc"><div class="pav">' + (p.nombre[0] || '') + (p.apellido[0] || '') + '</div><span class="pnm">' + p.apellido + ', ' + p.nombre + '</span></div>' });
+                var noG = pl.filter(function (p) { return !p.grupo || ['A', 'B', 'C', 'D'].indexOf(p.grupo) === -1 });
+                if (noG.length) {
+                    html += '<div class="slbl" style="margin-top:16px;margin-bottom:8px;color:#f87171">Sin grupo asignado</div>';
+                    noG.forEach(function (p) { html += '<div class="pc"><div class="pav">' + (p.nombre[0] || '') + (p.apellido[0] || '') + '</div><span class="pnm">' + p.apellido + ', ' + p.nombre + '</span></div>' });
+                }
+            } else {
+                // Single group
+                var gpl = pl.filter(function (p) { return p.grupo === selGrp }).sort(function (a, b) { return (a.apellido + a.nombre).localeCompare(b.apellido + b.nombre) });
+                if (gpl.length) html += buildGrid(gpl, 'Grupo ' + selGrp + ' — ' + CL[selCat]);
+                else html += '<div class="es"><div class="es-i">📋</div><div class="es-t">Sin participantes en Grupo ' + selGrp + '</div></div>';
             }
             el.innerHTML = html;
         }
@@ -1969,7 +1998,7 @@
                 var val = g === 'General' ? null : g;
                 var isAct = ptsGrp === val;
                 var style = isAct ? 'background:var(--acc-d);color:var(--acc);border-color:var(--acc)' : '';
-                gt.innerHTML += '<div class="ct" style="' + style + '" onclick="setPtsGrp(' + (val === null ? 'null' : '"' + val + '"') + ')">' + g + '</div>';
+                gt.innerHTML += '<div class="ct" style="' + style + '" onclick="setPtsGrp(' + (val === null ? 'null' : "'" + val + "'") + ')">' + g + '</div>';
             });
         }
         function togPCat(cat) { ptsCat = ptsCat === cat ? null : cat; ptsGrp = null; rPTabs(); rPts() }
