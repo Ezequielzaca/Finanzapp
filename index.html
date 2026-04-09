@@ -1921,12 +1921,14 @@
         function rCGrpTabs() {
             var gt = document.getElementById('cGrpTabs'); gt.innerHTML = '';
             if (!selCat) return;
-            var grps = ['General', 'A', 'B', 'C', 'D'];
-            grps.forEach(function (g) {
-                var val = g === 'General' ? null : g;
-                var isAct = selGrp === val;
-                var style = isAct ? 'background:var(--acc-d);color:var(--acc);border-color:var(--acc)' : '';
-                gt.innerHTML += '<div class="ct" style="' + style + '" onclick="setSelGrp(' + (val === null ? 'null' : "'" + val + "'") + ')">' + g + '</div>';
+            var grps = [null, 'A', 'B', 'C', 'D'];
+            var labels = ['General', 'A', 'B', 'C', 'D'];
+            grps.forEach(function (val, i) {
+                var d = document.createElement('div'); d.className = 'ct';
+                if (selGrp === val) { d.style.background = 'var(--acc-d)'; d.style.color = 'var(--acc)'; d.style.borderColor = 'var(--acc)' }
+                d.textContent = labels[i];
+                d.onclick = function () { selGrp = val; rCGrpTabs(); rGrid() };
+                gt.appendChild(d);
             });
         }
         function togCat(cat) { selCat = selCat === cat ? null : cat; selGrp = null; rCTabs(); rGrid() }
@@ -1993,12 +1995,14 @@
         function rPGrpTabs() {
             var gt = document.getElementById('pGrpTabs'); gt.innerHTML = '';
             if (!ptsCat) return;
-            var grps = ['General', 'A', 'B', 'C', 'D'];
-            grps.forEach(function (g) {
-                var val = g === 'General' ? null : g;
-                var isAct = ptsGrp === val;
-                var style = isAct ? 'background:var(--acc-d);color:var(--acc);border-color:var(--acc)' : '';
-                gt.innerHTML += '<div class="ct" style="' + style + '" onclick="setPtsGrp(' + (val === null ? 'null' : "'" + val + "'") + ')">' + g + '</div>';
+            var grps = [null, 'A', 'B', 'C', 'D'];
+            var labels = ['General', 'A', 'B', 'C', 'D'];
+            grps.forEach(function (val, i) {
+                var d = document.createElement('div'); d.className = 'ct';
+                if (ptsGrp === val) { d.style.background = 'var(--acc-d)'; d.style.color = 'var(--acc)'; d.style.borderColor = 'var(--acc)' }
+                d.textContent = labels[i];
+                d.onclick = function () { ptsGrp = val; rPGrpTabs(); rPts() };
+                gt.appendChild(d);
             });
         }
         function togPCat(cat) { ptsCat = ptsCat === cat ? null : cat; ptsGrp = null; rPTabs(); rPts() }
