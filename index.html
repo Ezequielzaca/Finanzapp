@@ -1612,8 +1612,7 @@
                         <div class="type-btn" id="btnExpense" onclick="setTxType('expense')">▼ Gasto</div>
                         <div class="type-btn" id="btnTransfer" onclick="setTxType('transfer')"
                             style="flex:1;background:rgba(100,180,255,.08);color:#64b4ff;border:1px solid rgba(100,180,255,.25)">
-                            ⇄
-                            Transferencia</div>
+                            ⇄ Transferencia</div>
                     </div>
                 </div>
                 <div class="form-group">
@@ -1625,8 +1624,7 @@
                 <div id="grupCuentaNormal">
                     <div class="form-group">
                         <label id="txCuentaLabel">Cuenta de gasto <span
-                                style="color:var(--muted);font-size:11px">(Tenis,
-                                Netflix...)</span></label>
+                                style="color:var(--muted);font-size:11px">(Tenis, Netflix...)</span></label>
                         <select id="txCuenta" onchange="onCuentaChange()"></select>
                     </div>
                     <!-- Cuenta origen: solo visible en gastos -->
@@ -1651,8 +1649,7 @@
                 <!-- Campo USD - solo visible cuando la cuenta es dólar -->
                 <div class="form-group" id="grupUSD" style="display:none">
                     <label>💵 Monto en dólares (USD) <span style="color:var(--muted);font-size:11px"
-                            id="usdOptLabel">(opcional —
-                            se calcula automático)</span></label>
+                            id="usdOptLabel">(opcional — se calcula automático)</span></label>
                     <input id="txMontoUSD" type="number" placeholder="100.00" min="0" step="0.01"
                         oninput="convertUSDtoARS()" />
                     <div id="usdConvInfo" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
@@ -1693,8 +1690,7 @@
                 </div>
                 <button class="submit-btn" onclick="saveTx()">Guardar</button>
                 <button class="modal-delete-btn" id="txDeleteBtn" onclick="deleteTxFromModal()" style="display:none">🗑
-                    Eliminar
-                    movimiento</button>
+                    Eliminar movimiento</button>
             </div>
         </div>
     </div>
@@ -1747,8 +1743,7 @@
                 </div>
                 <button class="submit-btn" onclick="saveCuenta()">Guardar Cuenta</button>
                 <button class="modal-delete-btn" id="cuentaDeleteBtn" onclick="deleteCuentaFromModal()"
-                    style="display:none">🗑
-                    Eliminar cuenta</button>
+                    style="display:none">🗑 Eliminar cuenta</button>
             </div>
         </div>
     </div>
@@ -1767,8 +1762,7 @@
                     style="background:rgba(200,241,53,.07);border:1px solid rgba(200,241,53,.2);border-radius:12px;padding:14px;margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.6">
                     <b style="color:var(--accent)">☁️ Google Drive automático</b><br>
                     Pegá aquí la URL de tu Google Apps Script para subir comprobantes directamente a tu Drive organizado
-                    por
-                    carpetas.
+                    por carpetas.
                     <br><br>
                     <span style="color:var(--text)">📁 Estructura:</span> <code
                         style="color:var(--accent2)">Ingresos/2026/03_Marzo/SueldoTelco.pdf</code>
@@ -1789,8 +1783,7 @@
                         style="background:rgba(53,241,160,.07);border:1px solid rgba(53,241,160,.2);border-radius:12px;padding:14px;margin-bottom:16px;font-size:12px;color:var(--muted);line-height:1.6">
                         <b style="color:var(--accent2)">💱 Cotizaciones (USD / Guaraní / Real)</b><br>
                         Pegá aquí la URL de tu Apps Script de cotizaciones para ver precios actualizados en tus cuentas
-                        en moneda
-                        extranjera.
+                        en moneda extranjera.
                     </div>
                     <div class="form-group">
                         <label>URL del Script de Cotizaciones</label>
@@ -1881,14 +1874,12 @@
                 </div>
                 <div class="form-group">
                     <label>Fecha de aviso <span style="color:var(--muted);font-size:11px">(opcional, para recordatorios
-                            de
-                            fecha)</span></label>
+                            de fecha)</span></label>
                     <input id="alertaFecha" type="date" />
                 </div>
                 <button class="submit-btn" onclick="saveAlerta()">Guardar Alerta</button>
                 <button class="modal-delete-btn" id="alertaDeleteBtn" onclick="deleteAlertaFromModal()"
-                    style="display:none">🗑
-                    Eliminar alerta</button>
+                    style="display:none">🗑 Eliminar alerta</button>
             </div>
         </div>
     </div>
