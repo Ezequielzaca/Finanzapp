@@ -2985,47 +2985,230 @@ function deleteGastoProgramado() {
 
 function renderGastosProgramados() {
   if (!state.gastosProgramados) state.gastosProgramados = [];
-  const resEl = document.getElementById('resumenGastosProgramados');
+  const resEl  = document.getElementById('resumenGastosProgramados');
   const listEl = document.getElementById('listGastosProgramados');
   if (!resEl || !listEl) return;
 
-  const gps = state.gastosProgramados;
-
-  if (gps.length === 0) {
-    resEl.innerHTML = '';
-    listEl.innerHTML = `<div class="empty" style="padding:16px 0"><div>Agregá gastos recurrentes para estimar el próximo mes</div></div>`;
-    return;
-  }
-
+  const gps   = state.gastosProgramados;
   const total = gps.reduce((s, g) => s + g.monto, 0);
 
-  // Banner total estimado
-  resEl.innerHTML = `
+  // ── CONCILIACIÓN: detectar si el gasto real del mes supera el estimado ──
+  const txsMes = getTxsForMonth(state.currentMonth, state.currentYear);
+  gps.forEach(g => {
+    // Buscar gastos reales que coincidan por cuenta de gasto o concepto similar
+    const realTxs = txsMes.filter(t => {
+      if (t.type !== 'expense') return false;
+      const cuenta = state.cuentas.find(c => c.id === t.cuentaId);
+      const matchCuenta = cuenta && normalizeStr(cuenta.nombre) === normalizeStr(g.desc);
+      const matchConcepto = normalizeStr(t.concepto).includes(normalizeStr(g.desc)) ||
+                            normalizeStr(g.desc).includes(normalizeStr(t.concepto));
+      return matchCuenta || matchConcepto;
+    });
+    const realTotal = realTxs.reduce((s, t) => s + t.monto, 0);
+    if (realTotal > 0 && realTotal > g.monto && !g._pendingUpdate) {
+      g._realTotal     = realTotal;
+      g._pendingUpdate = true;
+    } else if (realTotal <= g.monto) {
+      g._realTotal     = realTotal;
+      g._pendingUpdate = false;
+    }
+  });
+
+  // ── SUGERENCIAS: detectar gastos recurrentes no estimados ──
+  const sugerencias = detectarRecurrentes();
+
+  // Calcular pagados del mes actual
+  const mesKey = `${state.currentYear}-${state.currentMonth}`;
+  const pagados   = gps.filter(g => g.pagadoMeses?.[mesKey]);
+  const pendientes = gps.filter(g => !g.pagadoMeses?.[mesKey]);
+  const totalPagado   = pagados.reduce((s, g) => s + g.monto, 0);
+  const totalPendiente = pendientes.reduce((s, g) => s + g.monto, 0);
+  const pctPagado = total > 0 ? Math.round((totalPagado / total) * 100) : 0;
+
+  // Banner total
+  resEl.innerHTML = total > 0 ? `
     <div style="background:linear-gradient(135deg,rgba(241,160,53,.12),rgba(255,94,94,.08));border:1px solid rgba(241,160,53,.3);border-radius:16px;padding:16px 18px;margin-bottom:12px">
       <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">💸 Gasto estimado próximo mes</div>
       <div style="font-size:28px;font-weight:700;color:#f1a035">${fmt(total)}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px">${gps.length} ítem${gps.length !== 1 ? 's' : ''} programado${gps.length !== 1 ? 's' : ''}</div>
-    </div>`;
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:8px">
+        <span style="color:var(--accent2)">✓ Pagado: ${fmt(totalPagado)}</span>
+        <span style="color:var(--muted)">⏳ Pendiente: ${fmt(totalPendiente)}</span>
+      </div>
+      <div style="margin-top:6px;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${pctPagado}%;background:var(--accent2);border-radius:3px;transition:width .4s"></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">${pagados.length}/${gps.length} pagados este mes</div>
+    </div>` : '';
 
-  // Lista de ítems
-  listEl.innerHTML = gps.map(g => {
-    const info = TIPO_INFO[g.categoria] || { icon: '🗂', label: 'Otro' };
-    const pct  = total > 0 ? Math.round((g.monto / total) * 100) : 0;
-    return `
-    <div style="display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:8px;cursor:pointer" onclick="openGastoProgramadoModal('${g.id}')">
-      <div style="width:38px;height:38px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${info.icon}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600;color:var(--text)">${g.desc}</div>
-        <div style="margin-top:5px;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:#f1a035;border-radius:2px;transition:width .4s"></div>
+  // Sugerencias de recurrentes
+  const sugHtml = sugerencias.length > 0 ? `
+    <div style="background:rgba(100,180,255,.07);border:1px solid rgba(100,180,255,.25);border-radius:14px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:#64b4ff;margin-bottom:8px">💡 Gastos recurrentes detectados</div>
+      ${sugerencias.map(s => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+          <div>
+            <div style="font-size:13px;color:var(--text);font-weight:500">${s.desc}</div>
+            <div style="font-size:11px;color:var(--muted)">${s.veces} veces · prom. ${fmt(Math.round(s.promedio))}</div>
+          </div>
+          <button onclick="agregarSugerido('${encodeURIComponent(s.desc)}',${Math.round(s.promedio)},'${s.categoria}')"
+            style="background:rgba(100,180,255,.15);border:1px solid rgba(100,180,255,.3);color:#64b4ff;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">
+            + Agregar
+          </button>
+        </div>`).join('')}
+    </div>` : '';
+
+  // Lista de gastos programados con conciliación
+  const itemsHtml = gps.length === 0 ? `
+    <div class="empty" style="padding:16px 0"><div>Agregá gastos recurrentes para estimar el próximo mes</div></div>` :
+    gps.map(g => {
+      const info    = TIPO_INFO[g.categoria] || { icon:'🗂', label:'Otro' };
+      const pct     = total > 0 ? Math.round((g.monto / total) * 100) : 0;
+      const real    = g._realTotal || 0;
+      const excede  = g._pendingUpdate;
+      const tieneReal = real > 0;
+
+      // Barra de conciliación
+      const barReal  = tieneReal ? Math.min(100, Math.round((real / (excede ? real : g.monto)) * 100)) : 0;
+      const barColor = excede ? 'var(--red)' : 'var(--accent2)';
+
+      const concilHtml = tieneReal ? `
+        <div style="margin-top:6px;font-size:11px;color:${excede ? 'var(--red)' : 'var(--accent2)'}">
+          ${excede ? '⚠️' : '✅'} Real este mes: ${fmt(real)}
+          ${excede ? `<span style="color:var(--muted)"> · +${fmt(real - g.monto)} sobre estimado</span>` : ''}
         </div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:15px;font-weight:700;color:var(--red)">-${fmt(g.monto)}</div>
-        <div style="font-size:11px;color:var(--muted)">${pct}%</div>
-      </div>
-    </div>`;
-  }).join('');
+        <div style="margin-top:4px;height:3px;background:var(--surface2);border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:${barReal}%;background:${barColor};border-radius:2px;transition:width .4s"></div>
+        </div>` : `
+        <div style="margin-top:5px;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:#f1a035;border-radius:2px"></div>
+        </div>`;
+
+      const updateBtn = excede ? `
+        <button onclick="pedirActualizarEstimado('${g.id}',${real})"
+          style="margin-top:6px;width:100%;background:rgba(255,94,94,.1);border:1px solid rgba(255,94,94,.25);color:var(--red);border-radius:8px;padding:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">
+          🔄 Actualizar estimado a ${fmt(real)}
+        </button>` : '';
+
+      // Estado pagado: clave por mes/año para reset automático cada mes
+      const mesKey = `${state.currentYear}-${state.currentMonth}`;
+      if (!g.pagadoMeses) g.pagadoMeses = {};
+      const pagado = !!g.pagadoMeses[mesKey];
+
+      return `
+      <div style="padding:13px 14px;background:var(--surface);border:1px solid ${pagado ? 'rgba(53,241,160,.3)' : excede ? 'rgba(255,94,94,.3)' : 'var(--border)'};border-left:3px solid ${pagado ? 'var(--accent2)' : excede ? 'var(--red)' : '#f1a035'};border-radius:14px;margin-bottom:8px;opacity:${pagado ? 0.65 : 1};transition:opacity .2s">
+        <div style="display:flex;align-items:center;gap:12px">
+          <!-- Checkbox pagado -->
+          <div onclick="togglePagado('${g.id}')" style="width:26px;height:26px;border-radius:50%;border:2px solid ${pagado ? 'var(--accent2)' : 'var(--border)'};background:${pagado ? 'var(--accent2)' : 'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .2s">
+            ${pagado ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+          </div>
+          <div style="width:38px;height:38px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;cursor:pointer" onclick="openGastoProgramadoModal('${g.id}')">${info.icon}</div>
+          <div style="flex:1;min-width:0;cursor:pointer" onclick="openGastoProgramadoModal('${g.id}')">
+            <div style="font-size:14px;font-weight:600;color:var(--text);${pagado ? 'text-decoration:line-through;color:var(--muted)' : ''}">${g.desc}</div>
+            ${concilHtml}
+          </div>
+          <div style="text-align:right;flex-shrink:0;cursor:pointer" onclick="openGastoProgramadoModal('${g.id}')">
+            <div style="font-size:15px;font-weight:700;color:${pagado ? 'var(--accent2)' : excede ? 'var(--red)' : '#f1a035'}">-${fmt(g.monto)}</div>
+            <div style="font-size:11px;color:var(--muted)">${pagado ? '✓ pagado' : pct + '%'}</div>
+          </div>
+        </div>
+        ${updateBtn}
+      </div>`;
+    }).join('');
+
+  listEl.innerHTML = sugHtml + itemsHtml;
+}
+
+// Normalizar string para comparación (minúsculas, sin acentos, sin espacios extra)
+function normalizeStr(s) {
+  return (s || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, '').trim();
+}
+
+// Detectar gastos recurrentes no estimados aún
+function detectarRecurrentes() {
+  if (!state.transactions || !state.gastosProgramados) return [];
+
+  const gastos = state.transactions.filter(t => t.type === 'expense');
+  const yaEstimados = state.gastosProgramados.map(g => normalizeStr(g.desc));
+
+  // Agrupar por cuenta de gasto
+  const porCuenta = {};
+  gastos.forEach(t => {
+    const cuenta = state.cuentas.find(c => c.id === t.cuentaId);
+    if (!cuenta) return;
+    const key = normalizeStr(cuenta.nombre);
+    if (!porCuenta[key]) porCuenta[key] = { desc: cuenta.nombre, tipo: cuenta.tipo, montos: [], meses: new Set() };
+    porCuenta[key].montos.push(t.monto);
+    const d = new Date(t.date);
+    porCuenta[key].meses.add(`${d.getFullYear()}-${d.getMonth()}`);
+  });
+
+  // Agrupar por concepto similar
+  const porConcepto = {};
+  gastos.forEach(t => {
+    const key = normalizeStr(t.concepto);
+    if (!porConcepto[key]) porConcepto[key] = { desc: t.concepto, tipo: 'gasto_otro', montos: [], meses: new Set() };
+    porConcepto[key].montos.push(t.monto);
+    const d = new Date(t.date);
+    porConcepto[key].meses.add(`${d.getFullYear()}-${d.getMonth()}`);
+  });
+
+  const candidatos = { ...porCuenta };
+  Object.entries(porConcepto).forEach(([k, v]) => {
+    if (!candidatos[k]) candidatos[k] = v;
+  });
+
+  return Object.entries(candidatos)
+    .filter(([key, data]) => {
+      const veces   = data.montos.length;
+      const meses   = data.meses.size;
+      const total   = data.montos.reduce((a, b) => a + b, 0);
+      const promedio = total / veces;
+      // Criterios: 3+ veces, en 2+ meses distintos, promedio > 10000
+      if (veces < 3 || meses < 2 || promedio < 10000) return false;
+      // No estar ya en estimados
+      return !yaEstimados.some(e => e === key || key.includes(e) || e.includes(key));
+    })
+    .map(([key, data]) => ({
+      desc:      data.desc,
+      categoria: data.tipo || 'gasto_otro',
+      veces:     data.montos.length,
+      meses:     data.meses.size,
+      promedio:  data.montos.reduce((a, b) => a + b, 0) / data.montos.length
+    }))
+    .sort((a, b) => b.promedio - a.promedio)
+    .slice(0, 5); // máximo 5 sugerencias
+}
+
+function agregarSugerido(descEnc, monto, categoria) {
+  const desc = decodeURIComponent(descEnc);
+  state.gastosProgramados.push({ id: uid(), desc, monto, categoria });
+  saveState();
+  renderGastosProgramados();
+}
+
+function togglePagado(id) {
+  const gp = state.gastosProgramados.find(g => g.id === id);
+  if (!gp) return;
+  if (!gp.pagadoMeses) gp.pagadoMeses = {};
+  const mesKey = `${state.currentYear}-${state.currentMonth}`;
+  gp.pagadoMeses[mesKey] = !gp.pagadoMeses[mesKey];
+  saveState();
+  renderGastosProgramados();
+}
+
+function pedirActualizarEstimado(id, realMonto) {
+  event.stopPropagation();
+  const gp = state.gastosProgramados.find(g => g.id === id);
+  if (!gp) return;
+  const confirmar = confirm(`¿Actualizar el estimado de "${gp.desc}" de ${fmt(gp.monto)} a ${fmt(realMonto)}?`);
+  if (!confirmar) return;
+  gp.monto          = realMonto;
+  gp._pendingUpdate = false;
+  gp._realTotal     = realMonto;
+  saveState();
+  renderGastosProgramados();
 }
 
 // ========== GASTOS HORMIGA ==========
