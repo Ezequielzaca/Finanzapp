@@ -588,6 +588,75 @@
   }
   .fab:active { transform: scale(.93); }
 
+  /* ===== TOAST ===== */
+  #toastContainer {
+    position: fixed; bottom: calc(60px + 80px); left: 50%;
+    transform: translateX(-50%); z-index: 3000;
+    display: flex; flex-direction: column; gap: 8px;
+    align-items: center; pointer-events: none; width: 100%;
+    max-width: 340px; padding: 0 16px;
+  }
+  .toast {
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border); border-left: 3px solid var(--accent2);
+    border-radius: 12px; padding: 12px 16px; font-size: 13px; font-weight: 500;
+    box-shadow: 0 6px 20px rgba(0,0,0,.4);
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    animation: toastIn .3s ease, toastOut .3s ease 2.4s forwards;
+  }
+  .toast.success { border-left-color: var(--accent2); }
+  .toast.error   { border-left-color: var(--red); }
+  .toast.info    { border-left-color: var(--yellow); }
+  @keyframes toastIn  { from { opacity:0; transform:translateY(12px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
+  @keyframes toastOut { from { opacity:1; } to { opacity:0; transform:translateY(-8px); } }
+
+  /* ===== SEARCH BAR ===== */
+  .search-wrap {
+    position: relative; margin-bottom: 12px;
+  }
+  .search-input {
+    width: 100%; padding: 11px 14px 11px 40px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; color: var(--text); font-size: 14px;
+    font-family: 'DM Sans', sans-serif; transition: border-color .2s;
+  }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+  .search-icon {
+    position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 16px; pointer-events: none;
+  }
+  .search-clear {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: var(--border); border: none; color: var(--text);
+    width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+    font-size: 13px; display: none; align-items: center; justify-content: center;
+  }
+  .search-clear.show { display: flex; }
+
+  /* ===== SWIPE TO DELETE/EDIT ===== */
+  .swipe-container {
+    position: relative; overflow: hidden; border-radius: 8px;
+    margin-bottom: 0;
+  }
+  .swipe-actions {
+    position: absolute; top: 0; right: 0; height: 100%;
+    display: flex; align-items: stretch;
+  }
+  .swipe-action {
+    display: flex; align-items: center; justify-content: center;
+    width: 64px; font-size: 20px; border: none; cursor: pointer;
+    color: #fff; font-family: 'DM Sans', sans-serif;
+  }
+  .swipe-action.edit   { background: var(--yellow); color: #000; }
+  .swipe-action.delete { background: var(--red); }
+  .swipe-content {
+    position: relative; z-index: 1; background: var(--bg);
+    transition: transform .25s ease; will-change: transform;
+    touch-action: pan-y;
+  }
+  .swipe-content.swiped { transform: translateX(-128px); }
+  body.light .swipe-content { background: var(--bg); }
+
   /* ===== CUENTA SIMPLE ROW (Ingresos) ===== */
   .cuenta-simple {
     display: flex; align-items: center; gap: 12px;
@@ -716,6 +785,11 @@
         <label>Balance del mes</label>
         <div class="val bal" id="homeBalance">$0,00</div>
       </div>
+    </div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInicio" placeholder="Buscar por concepto, cuenta o monto..." oninput="onSearchInicio()" />
+      <button class="search-clear" id="searchClear" onclick="clearSearchInicio()">✕</button>
     </div>
     <div id="listDiario"></div>
   </div>
@@ -857,6 +931,9 @@
 
 <!-- FAB -->
 <button class="fab" onclick="openFabMenu()">+</button>
+
+<!-- TOAST CONTAINER -->
+<div id="toastContainer"></div>
 
 <!-- FAB MENU -->
 <div class="modal-overlay" id="fabMenu" onclick="if(event.target===this)closeModal('fabMenu')">
@@ -1230,6 +1307,7 @@ let state = {
   editingCuentaId: null,
   editingAlertaId: null,
   editingGastoProgramadoId: null,
+  searchQuery: '',
   driveScriptUrl: '',
   cotizProxyUrl: ''
 };
@@ -1249,6 +1327,18 @@ function loadState() {
       state.cotizProxyUrl       = parsed.cotizProxyUrl       || '';
     }
   } catch(e) { console.error('loadState error:', e); }
+}
+
+// ========== TOAST ==========
+function showToast(msg, type = 'success') {
+  const cont = document.getElementById('toastContainer');
+  if (!cont) return;
+  const icons = { success: '✓', error: '⚠️', info: 'ℹ️' };
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<span>${icons[type] || ''}</span><span>${msg}</span>`;
+  cont.appendChild(t);
+  setTimeout(() => t.remove(), 2800);
 }
 
 function saveState() {
@@ -1597,7 +1687,25 @@ function renderInicio() {
   balEl.className = 'val ' + (bal >= 0 ? 'bal' : 'neg');
 
   // Agrupar todos los movimientos (income + expense, no transfers) por día
-  const movs = txs.filter(t => t.type !== 'transfer' || t.transferRole === 'out');
+  let movs = txs.filter(t => t.type !== 'transfer' || t.transferRole === 'out');
+
+  // Filtro de búsqueda
+  const q = (state.searchQuery || '').trim().toLowerCase();
+  if (q) {
+    movs = movs.filter(t => {
+      const cuenta = state.cuentas.find(c => c.id === t.cuentaId);
+      const origen = t.origenId ? state.cuentas.find(c => c.id === t.origenId) : null;
+      const haystack = [
+        t.concepto,
+        cuenta?.nombre,
+        origen?.nombre,
+        String(t.monto),
+        fmt(t.monto)
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }
+
   const byDay = {};
   movs.forEach(t => {
     const d = new Date(t.date);
@@ -1610,7 +1718,8 @@ function renderInicio() {
   const days = Object.keys(byDay).sort((a,b) => b.localeCompare(a));
 
   if (days.length === 0) {
-    el.innerHTML = `<div class="empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><div>Sin movimientos este mes</div></div>`;
+    const msg = q ? `Sin resultados para "${q}"` : 'Sin movimientos este mes';
+    el.innerHTML = `<div class="empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><div>${msg}</div></div>`;
     return;
   }
 
@@ -1658,13 +1767,19 @@ function renderInicio() {
         amountTxt   = '-' + fmt(t.monto);
       }
 
-      return `<div class="day-tx" onclick="editTx('${t.id}')">
-        <div class="day-cat">${catLabel}</div>
-        <div class="day-tx-info">
-          <div class="day-tx-concept">${t.concepto}</div>
-          <div class="day-tx-sub">${subLabel}</div>
+      return `<div class="swipe-container">
+        <div class="swipe-actions">
+          <button class="swipe-action edit" onclick="event.stopPropagation();editTx('${t.id}')">✏️</button>
+          <button class="swipe-action delete" onclick="event.stopPropagation();deleteTxSwipe('${t.id}')">🗑</button>
         </div>
-        <div class="day-tx-amount ${amountClass}">${amountTxt}</div>
+        <div class="swipe-content day-tx" data-txid="${t.id}" onclick="handleTxClick(event,'${t.id}')">
+          <div class="day-cat">${catLabel}</div>
+          <div class="day-tx-info">
+            <div class="day-tx-concept">${t.concepto}</div>
+            <div class="day-tx-sub">${subLabel}</div>
+          </div>
+          <div class="day-tx-amount ${amountClass}">${amountTxt}</div>
+        </div>
       </div>`;
     }).join('');
 
@@ -1677,6 +1792,79 @@ function renderInicio() {
       ${txRows}
     </div>`;
   }).join('');
+}
+
+// ========== BÚSQUEDA INICIO ==========
+function onSearchInicio() {
+  const inp = document.getElementById('searchInicio');
+  state.searchQuery = inp.value;
+  document.getElementById('searchClear').classList.toggle('show', !!inp.value);
+  renderInicio();
+}
+function clearSearchInicio() {
+  state.searchQuery = '';
+  document.getElementById('searchInicio').value = '';
+  document.getElementById('searchClear').classList.remove('show');
+  renderInicio();
+  setupSwipe();
+}
+
+// ========== SWIPE TO DELETE/EDIT ==========
+let swipeState = { el: null, startX: 0, currentX: 0, active: false };
+
+function handleTxClick(e, id) {
+  // Si hay algún swipe abierto, cerrarlo en vez de abrir edición
+  const opened = document.querySelector('.swipe-content.swiped');
+  if (opened) {
+    opened.classList.remove('swiped');
+    return;
+  }
+  editTx(id);
+}
+
+function setupSwipe() {
+  document.querySelectorAll('.swipe-content').forEach(el => {
+    if (el.dataset.swipeInit) return;
+    el.dataset.swipeInit = '1';
+
+    el.addEventListener('touchstart', e => {
+      // cerrar otros
+      document.querySelectorAll('.swipe-content.swiped').forEach(o => { if (o !== el) o.classList.remove('swiped'); });
+      swipeState = { el, startX: e.touches[0].clientX, currentX: e.touches[0].clientX, active: true };
+    }, { passive: true });
+
+    el.addEventListener('touchmove', e => {
+      if (!swipeState.active || swipeState.el !== el) return;
+      swipeState.currentX = e.touches[0].clientX;
+      const dx = swipeState.currentX - swipeState.startX;
+      const base = el.classList.contains('swiped') ? -128 : 0;
+      let tx = base + dx;
+      tx = Math.max(-128, Math.min(0, tx));
+      el.style.transform = `translateX(${tx}px)`;
+    }, { passive: true });
+
+    el.addEventListener('touchend', () => {
+      if (!swipeState.active || swipeState.el !== el) return;
+      const dx = swipeState.currentX - swipeState.startX;
+      el.style.transform = '';
+      if (dx < -50) el.classList.add('swiped');
+      else if (dx > 50) el.classList.remove('swiped');
+      swipeState.active = false;
+    });
+  });
+}
+
+function deleteTxSwipe(id) {
+  const t = state.transactions.find(x => x.id === id);
+  if (!t) return;
+  if (t.type === 'transfer') {
+    state.transactions = state.transactions.filter(x => x.transferId !== t.transferId);
+  } else {
+    state.transactions = state.transactions.filter(x => x.id !== id);
+  }
+  saveState();
+  render();
+  showToast('Movimiento eliminado', 'error');
 }
 
 function renderTxList(elId, txs, type) {
@@ -2754,6 +2942,7 @@ function saveTx() {
     state.transactions.push({ id: uid(), ...txBase, transferId, cuentaId: destinoId, transferRole: 'in'  });
 
     saveState(); closeModal('txModal'); render();
+    showToast('Transferencia guardada');
     return;
   }
 
@@ -2791,9 +2980,12 @@ function saveTx() {
     });
   }
 
+  const wasEditing = !!state.editingTxId;
+  const savedType = state.txType;
   saveState();
   closeModal('txModal');
   render();
+  showToast(wasEditing ? 'Movimiento actualizado' : (savedType === 'income' ? 'Ingreso guardado' : 'Gasto guardado'));
 
   if (fileToUpload && state.driveScriptUrl) {
     uploadToDrive(fileToUpload, state.txType, concepto, txDate)
@@ -2819,9 +3011,11 @@ function saveCuenta() {
     state.cuentas.push({ id: uid(), nombre, tipo, saldoInicial: saldo });
   }
 
+  const wasEditingC = !!state.editingCuentaId;
   saveState();
   closeModal('cuentaModal');
   render();
+  showToast(wasEditingC ? 'Cuenta actualizada' : 'Cuenta creada');
 }
 
 function deleteTxFromModal() {
@@ -2902,6 +3096,8 @@ function render() {
   // Sync theme label
   const ti = document.getElementById('themeItem');
   if (ti) ti.textContent = document.body.classList.contains('light') ? '🌙 Tema oscuro' : '☀️ Tema claro';
+  // Setup swipe gestures on transaction rows
+  setTimeout(setupSwipe, 50);
 }
 
 // ========== COTIZACIONES ==========
