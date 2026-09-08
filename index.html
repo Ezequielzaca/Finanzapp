@@ -4594,22 +4594,50 @@ function renderStock() {
   };
   const ubicOrder = ['cocina','bano','pieza','lavanderia','general'];
 
-  // Orden alfabético dentro de cada ambiente (siempre igual)
+  // Nombre de cada categoría (por su emoji)
+  const CAT_LABEL = {
+    '🥫': 'Almacén', '🥩': 'Carnes', '🥦': 'Verduras', '🍎': 'Frutas',
+    '🥛': 'Lácteos', '🧊': 'Congelados', '🍞': 'Panadería', '🧴': 'Limpieza',
+    '🧻': 'Higiene', '🥤': 'Bebidas', '📦': 'Otro'
+  };
+
   ubicOrder.forEach(ub => {
-    const delAmbiente = items
-      .filter(i => (i.ubicacion || 'general') === ub)
-      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+    const delAmbiente = items.filter(i => (i.ubicacion || 'general') === ub);
     if (delAmbiente.length === 0) return;
 
     const info = UBIC[ub];
     const nAComprar = delAmbiente.filter(i => stockNivel(i) === 'rojo').length;
+    // Encabezado del ambiente
     html += `<div style="display:flex;align-items:center;gap:8px;margin:18px 0 10px">
       <span style="font-size:16px">${info.icon}</span>
       <span style="font-size:14px;font-weight:700;color:var(--text)">${info.label}</span>
       ${nAComprar > 0 ? `<span style="font-size:10px;background:rgba(255,94,94,.15);color:var(--red);padding:2px 8px;border-radius:6px;font-weight:600">${nAComprar} a comprar</span>` : ''}
       <span style="flex:1;height:1px;background:var(--border)"></span>
     </div>`;
-    html += delAmbiente.map(renderItem).join('');
+
+    // Agrupar por categoría (emoji) dentro del ambiente
+    const porCat = {};
+    delAmbiente.forEach(i => {
+      const cat = i.categoria || '📦';
+      if (!porCat[cat]) porCat[cat] = [];
+      porCat[cat].push(i);
+    });
+
+    // Ordenar categorías alfabéticamente por su nombre
+    const catsOrdenadas = Object.keys(porCat).sort((a, b) => {
+      const la = CAT_LABEL[a] || 'Otro';
+      const lb = CAT_LABEL[b] || 'Otro';
+      return la.localeCompare(lb, 'es', { sensitivity: 'base' });
+    });
+
+    catsOrdenadas.forEach(cat => {
+      const label = CAT_LABEL[cat] || 'Otro';
+      // Sub-encabezado de categoría
+      html += `<div style="font-size:11px;font-weight:600;color:var(--muted);margin:10px 0 6px 2px">${cat} ${label}</div>`;
+      // Productos ordenados alfabéticamente dentro de la categoría
+      const ordenados = porCat[cat].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+      html += ordenados.map(renderItem).join('');
+    });
   });
 
   listEl.innerHTML = html;
