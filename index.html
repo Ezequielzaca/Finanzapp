@@ -604,6 +604,22 @@
   .sub-tab.active { display: block; animation: fadeIn .2s ease; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+  /* ===== PIN LOCK ===== */
+  .pin-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid var(--muted); transition: all .2s;
+  }
+  .pin-dot.filled { background: var(--accent); border-color: var(--accent); }
+  .pin-dot.error { border-color: var(--red); background: var(--red); animation: shake .4s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+  .pin-key {
+    aspect-ratio: 1; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 24px;
+    font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer;
+    transition: all .15s; display: flex; align-items: center; justify-content: center;
+  }
+  .pin-key:active { background: var(--surface2); transform: scale(.95); }
+
   /* ===== TOAST ===== */
   #toastContainer {
     position: fixed; bottom: calc(60px + 80px); left: 50%;
@@ -765,6 +781,17 @@
 </head>
 <body>
 
+<!-- PIN LOCK OVERLAY -->
+<div id="pinLockOverlay" style="display:none;position:fixed;inset:0;z-index:5000;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;padding:24px">
+  <div style="font-size:48px;margin-bottom:8px">🔒</div>
+  <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px">FinanzApp</div>
+  <div id="pinLockMsg" style="font-size:13px;color:var(--muted);margin-bottom:24px">Ingresá tu PIN</div>
+  <div id="pinDots" style="display:flex;gap:14px;margin-bottom:32px">
+    <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+  </div>
+  <div id="pinPad" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:260px;width:100%"></div>
+</div>
+
 <!-- HEADER -->
 <div class="header">
   <div class="header-title">FinanzApp</div>
@@ -774,6 +801,7 @@
       <button onclick="toggleCtxMenu()" id="ctxBtn" style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:6px 10px;color:var(--muted);cursor:pointer;font-size:15px;transition:border-color .2s">⚙️</button>
       <div class="ctx-menu" id="ctxMenu">
         <div class="ctx-item" onclick="closeCtxMenu();switchTab('resumen')">📊 Resumen</div>
+        <div class="ctx-item" onclick="closeCtxMenu();switchTab('metas')">🎯 Metas de ahorro</div>
         <div class="ctx-item" onclick="closeCtxMenu();switchTab('mealplanner')">🍽 Meal Planner</div>
         <div class="ctx-item" onclick="closeCtxMenu();openSettings()">⚙️ Configuración</div>
         <div class="ctx-item" onclick="closeCtxMenu();toggleTheme()" id="themeItem">☀️ Tema claro</div>
@@ -880,6 +908,15 @@
     <div id="listRecetas"></div>
   </div>
 
+  <!-- TAB METAS DE AHORRO -->
+  <div class="tab" id="tab-metas">
+    <div class="section-title">
+      <span>🎯 Metas de ahorro</span>
+      <button class="add-btn" onclick="openMetaModal()">+ Meta</button>
+    </div>
+    <div id="listMetas"></div>
+  </div>
+
   <!-- TAB 3: CUENTAS INGRESOS -->
   <div class="tab" id="tab-ingresos">
     <div id="patrimonioCard"></div>
@@ -904,36 +941,32 @@
 
   <!-- TAB 5: ALERTAS -->
   <div class="tab" id="tab-alertas">
-    <!-- Sub-navegación -->
+    <!-- Sub-navegación (2 secciones) -->
     <div class="sub-nav">
-      <button class="sub-nav-btn active" id="subnav-alertas" onclick="switchSubTab('alertas')">🔔 Alertas</button>
-      <button class="sub-nav-btn" id="subnav-programados" onclick="switchSubTab('programados')">📅 Programados</button>
-      <button class="sub-nav-btn" id="subnav-hormiga" onclick="switchSubTab('hormiga')">🐜 Hormiga</button>
+      <button class="sub-nav-btn active" id="subnav-alertas" onclick="switchSubTab('alertas')">🔔 Recordatorios</button>
+      <button class="sub-nav-btn" id="subnav-gastos" onclick="switchSubTab('gastos')">💸 Gastos</button>
     </div>
 
-    <!-- SUB: ALERTAS -->
+    <!-- SUB: RECORDATORIOS / ALERTAS -->
     <div class="sub-tab active" id="subtab-alertas">
       <div class="section-title">
-        <span>🔔 Mis Alertas</span>
-        <button class="add-btn" onclick="openAlertaModal()">+ Alerta</button>
+        <span>🔔 Recordatorios</span>
+        <button class="add-btn" onclick="openAlertaModal()">+ Recordatorio</button>
       </div>
       <div id="alertasTriggeradas" style="margin-bottom:8px"></div>
       <div id="listAlertas"></div>
     </div>
 
-    <!-- SUB: GASTOS PROGRAMADOS -->
-    <div class="sub-tab" id="subtab-programados">
+    <!-- SUB: GASTOS (Programados + Hormiga juntos) -->
+    <div class="sub-tab" id="subtab-gastos">
       <div class="section-title">
         <span>📅 Gastos Programados</span>
         <button class="add-btn" onclick="openGastoProgramadoModal()">+ Agregar</button>
       </div>
       <div id="resumenGastosProgramados"></div>
       <div id="listGastosProgramados"></div>
-    </div>
 
-    <!-- SUB: GASTOS HORMIGA -->
-    <div class="sub-tab" id="subtab-hormiga">
-      <div class="section-title">
+      <div class="section-title" style="margin-top:24px">
         <span>🐜 Gastos Hormiga</span>
         <span id="hormigaLimiteLabel" style="font-size:12px;color:var(--muted)"></span>
       </div>
@@ -1249,6 +1282,12 @@
     </div>
 
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px">🔒 Seguridad (PIN)</div>
+      <div id="pinStatus" style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6"></div>
+      <button id="pinToggleBtn" class="submit-btn" onclick="configurarPin()">Activar PIN de bloqueo</button>
+    </div>
+
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px">⚠️ Zona de peligro</div>
       <button onclick="confirmReset()" style="width:100%;padding:11px;background:rgba(255,94,94,.08);border:1px solid rgba(255,94,94,.25);color:var(--red);border-radius:12px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
         🗑 Borrar todos los datos
@@ -1476,6 +1515,53 @@
   </div>
 </div>
 
+<!-- MODAL META DE AHORRO -->
+<div class="modal-overlay" id="metaModal" onclick="if(event.target===this)closeModal('metaModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span id="metaModalTitle">🎯 Nueva Meta</span>
+        <div class="modal-close" onclick="closeModal('metaModal')">✕</div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>¿Qué querés lograr?</label>
+        <input id="metaNombre" placeholder="Ej: Vacaciones, Notebook, Auto..." />
+      </div>
+      <div class="form-group">
+        <label>Ícono</label>
+        <select id="metaIcono">
+          <option value="🎯">🎯 General</option>
+          <option value="✈️">✈️ Viaje</option>
+          <option value="🏠">🏠 Casa</option>
+          <option value="🚗">🚗 Auto</option>
+          <option value="💻">💻 Tecnología</option>
+          <option value="🎓">🎓 Estudios</option>
+          <option value="💍">💍 Evento</option>
+          <option value="🏥">🏥 Emergencia</option>
+          <option value="🎁">🎁 Regalo</option>
+          <option value="💰">💰 Fondo</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Monto objetivo</label>
+        <input id="metaObjetivo" type="number" placeholder="0" min="0" step="1000" />
+      </div>
+      <div class="form-group">
+        <label>Ahorrado hasta ahora</label>
+        <input id="metaAhorrado" type="number" placeholder="0" min="0" step="1000" />
+      </div>
+      <div class="form-group">
+        <label>Fecha límite <span style="color:var(--muted);font-size:11px">(opcional)</span></label>
+        <input id="metaFecha" type="date" />
+      </div>
+      <button class="submit-btn" onclick="saveMeta()">Guardar</button>
+      <button class="modal-delete-btn" id="metaDeleteBtn" onclick="deleteMeta()" style="display:none">🗑 Eliminar</button>
+    </div>
+  </div>
+</div>
+
 <div class="viewer-overlay" id="viewerOverlay">
   <div class="viewer-header">
     <span class="viewer-title" id="viewerTitle">Comprobante</span>
@@ -1512,6 +1598,9 @@ let state = {
   editingStockId: null,
   editingRecetaId: null,
   lastOrigenId: null,
+  pin: null,
+  metas: [],
+  editingMetaId: null,
   driveScriptUrl: '',
   cotizProxyUrl: ''
 };
@@ -1530,6 +1619,8 @@ function loadState() {
       state.recetas             = parsed.recetas             || [];
       state.mealPlan            = parsed.mealPlan            || {};
       state.lastOrigenId        = parsed.lastOrigenId        || null;
+      state.pin                 = parsed.pin                 || null;
+      state.metas               = parsed.metas               || [];
       state.umbralHormiga       = parsed.umbralHormiga       ?? 5000;
       state.driveScriptUrl      = parsed.driveScriptUrl      || '';
       state.cotizProxyUrl       = parsed.cotizProxyUrl       || '';
@@ -1560,6 +1651,8 @@ function saveState() {
       recetas:           state.recetas,
       mealPlan:          state.mealPlan,
       lastOrigenId:      state.lastOrigenId,
+      pin:               state.pin,
+      metas:             state.metas,
       umbralHormiga:     state.umbralHormiga,
       driveScriptUrl:    state.driveScriptUrl,
       cotizProxyUrl:     state.cotizProxyUrl
@@ -1729,6 +1822,7 @@ function openSettings() {
   document.getElementById('settingsUrl').value = state.driveScriptUrl || '';
   document.getElementById('settingsCotizUrl').value = state.cotizProxyUrl || '';
   document.getElementById('settingsUmbralHormiga').value = state.umbralHormiga || 5000;
+  updatePinStatus();
 }
 
 function saveSettings() {
@@ -2245,59 +2339,68 @@ function renderResumen() {
   // ── TORTA ──
   if (f === 'torta') {
     const txsMes = getTxsForMonth(currentMonth, currentYear);
-    const totalIn  = txsMes.filter(t=>t.type==='income').reduce((a,t)=>a+t.monto,0);
     const totalOut = txsMes.filter(t=>t.type==='expense').reduce((a,t)=>a+t.monto,0);
-    const total = totalIn + totalOut || 1;
-    const pIn  = (totalIn  / total * 100).toFixed(1);
-    const pOut = (totalOut / total * 100).toFixed(1);
-    // SVG donut
-    const r = 70, cx = 90, cy = 90, circum = 2 * Math.PI * r;
-    const dashIn  = (totalIn  / total * circum).toFixed(2);
-    const dashOut = (totalOut / total * circum).toFixed(2);
-    const offsetOut = (- (totalIn / total * circum) + circum / 4).toFixed(2);
 
-    // Breakdown por cuenta de gasto
-    const gastosPorCuenta = {};
+    // Agrupar gastos por CATEGORÍA (tipo de cuenta de gasto)
+    const porCategoria = {};
     txsMes.filter(t=>t.type==='expense').forEach(t => {
       const c = cuentas.find(x=>x.id===t.cuentaId);
-      const label = c ? c.nombre : 'Sin cuenta';
-      gastosPorCuenta[label] = (gastosPorCuenta[label]||0) + t.monto;
+      const tipo = c ? c.tipo : 'gasto_otro';
+      const info = TIPO_INFO[tipo] || { icon:'🗂', label:'Otro' };
+      const key = info.label;
+      if (!porCategoria[key]) porCategoria[key] = { monto: 0, icon: info.icon };
+      porCategoria[key].monto += t.monto;
     });
-    const gastosSorted = Object.entries(gastosPorCuenta).sort((a,b)=>b[1]-a[1]);
-    const colors = ['#c8f135','#35f1a0','#f1a035','#f13535','#357ef1','#c335f1','#35d4f1','#f1e535'];
+    const catSorted = Object.entries(porCategoria).sort((a,b)=>b[1].monto-a[1].monto);
+    const colors = ['#c8f135','#35f1a0','#f7d038','#ff5e5e','#357ef1','#c335f1','#35d4f1','#f1a035','#f13591','#8bf135'];
+
+    if (catSorted.length === 0) {
+      el.innerHTML = `<div class="empty"><div style="font-size:32px;margin-bottom:8px">🥧</div><div>Sin gastos este mes para graficar</div></div>`;
+      return;
+    }
+
+    // Construir segmentos del pie
+    const r = 70, cx = 90, cy = 90, circum = 2 * Math.PI * r;
+    let acumulado = 0;
+    const segmentos = catSorted.map(([label, data], i) => {
+      const frac = data.monto / totalOut;
+      const dash = (frac * circum).toFixed(2);
+      const offset = (-acumulado * circum + circum / 4).toFixed(2);
+      acumulado += frac;
+      const color = colors[i % colors.length];
+      return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="30"
+        stroke-dasharray="${dash} ${circum}" stroke-dashoffset="${offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    }).join('');
 
     el.innerHTML = `
     <div style="background:var(--surface);border-radius:16px;padding:16px;margin-bottom:12px">
-      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;text-align:center">${MONTHS[currentMonth]} ${currentYear}</div>
-      <svg viewBox="0 0 180 180" style="width:160px;display:block;margin:0 auto 16px">
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface2)" stroke-width="22"/>
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--accent2)" stroke-width="22"
-          stroke-dasharray="${dashIn} ${circum}" stroke-dashoffset="${(circum/4).toFixed(2)}" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--red)" stroke-width="22"
-          stroke-dasharray="${dashOut} ${circum}" stroke-dashoffset="${offsetOut}" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>
-        <text x="${cx}" y="${cy - 8}" text-anchor="middle" font-size="13" fill="var(--muted)" font-family="DM Sans">Balance</text>
-        <text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="14" fill="${totalIn>=totalOut?'var(--accent2)':'var(--red)'}" font-weight="600" font-family="DM Sans">${totalIn>=totalOut?'+':''}${fmt(totalIn-totalOut)}</text>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;text-align:center">Gastos por categoría · ${MONTHS[currentMonth]} ${currentYear}</div>
+      <svg viewBox="0 0 180 180" style="width:180px;display:block;margin:0 auto 16px">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface2)" stroke-width="30"/>
+        ${segmentos}
+        <circle cx="${cx}" cy="${cy}" r="52" fill="var(--surface)"/>
+        <text x="${cx}" y="${cy - 6}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="DM Sans">Total gastos</text>
+        <text x="${cx}" y="${cy + 12}" text-anchor="middle" font-size="14" fill="var(--red)" font-weight="700" font-family="DM Sans">${fmt(totalOut)}</text>
       </svg>
-      <div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px">
-        <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;border-radius:50%;background:var(--accent2)"></div><span style="font-size:12px;color:var(--muted)">Ingresos ${pIn}%</span></div>
-        <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;border-radius:50%;background:var(--red)"></div><span style="font-size:12px;color:var(--muted)">Gastos ${pOut}%</span></div>
-      </div>
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Detalle gastos</div>
-      ${gastosSorted.length === 0 ? '<div style="color:var(--muted);font-size:13px;text-align:center">Sin gastos este mes</div>' :
-        gastosSorted.map(([label, monto], i) => {
-          const pct = totalOut > 0 ? (monto / totalOut * 100).toFixed(1) : 0;
-          const color = colors[i % colors.length];
-          return `<div style="margin-bottom:8px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px">Desglose</div>
+      ${catSorted.map(([label, data], i) => {
+        const pct = (data.monto / totalOut * 100).toFixed(1);
+        const color = colors[i % colors.length];
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:14px;height:14px;border-radius:4px;background:${color};flex-shrink:0"></div>
+          <span style="font-size:16px">${data.icon}</span>
+          <div style="flex:1;min-width:0">
             <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-              <span style="font-size:12px;color:var(--text)">${label}</span>
-              <span style="font-size:12px;color:var(--red)">-${fmt(monto)} <span style="color:var(--muted)">(${pct}%)</span></span>
+              <span style="font-size:13px;color:var(--text)">${label}</span>
+              <span style="font-size:13px;color:var(--red);font-weight:600">-${fmt(data.monto)}</span>
             </div>
-            <div style="background:var(--surface2);border-radius:4px;height:6px">
-              <div style="background:${color};height:6px;border-radius:4px;width:${pct}%"></div>
+            <div style="background:var(--surface2);border-radius:4px;height:5px">
+              <div style="background:${color};height:5px;border-radius:4px;width:${pct}%"></div>
             </div>
-          </div>`;
-        }).join('')
-      }
+          </div>
+          <span style="font-size:12px;color:var(--muted);min-width:38px;text-align:right">${pct}%</span>
+        </div>`;
+      }).join('')}
     </div>`;
     return;
   }
@@ -3445,6 +3548,7 @@ function render() {
   renderGastosHormiga();
   renderStock();
   renderMealPlanner();
+  renderMetas();
   // Sync theme label
   const ti = document.getElementById('themeItem');
   if (ti) ti.textContent = document.body.classList.contains('light') ? '🌙 Tema oscuro' : '☀️ Tema claro';
@@ -4449,13 +4553,11 @@ function renderStock() {
   };
   const ubicOrder = ['cocina','bano','pieza','lavanderia','general'];
 
-  // Orden por nivel dentro de cada ambiente: rojo → amarillo → verde
-  const nivelPeso = { rojo: 0, amarillo: 1, verde: 2 };
-
+  // Orden alfabético dentro de cada ambiente (siempre igual)
   ubicOrder.forEach(ub => {
     const delAmbiente = items
       .filter(i => (i.ubicacion || 'general') === ub)
-      .sort((a, b) => nivelPeso[stockNivel(a)] - nivelPeso[stockNivel(b)]);
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
     if (delAmbiente.length === 0) return;
 
     const info = UBIC[ub];
@@ -4641,9 +4743,249 @@ function renderMealPlanner() {
   }).join('');
 }
 
+// ========== METAS DE AHORRO ==========
+function openMetaModal(id = null) {
+  state.editingMetaId = id;
+  const del = document.getElementById('metaDeleteBtn');
+  if (id) {
+    const m = state.metas.find(x => x.id === id);
+    if (!m) return;
+    document.getElementById('metaModalTitle').textContent = '✏️ Editar Meta';
+    document.getElementById('metaNombre').value   = m.nombre;
+    document.getElementById('metaIcono').value    = m.icono || '🎯';
+    document.getElementById('metaObjetivo').value = m.objetivo;
+    document.getElementById('metaAhorrado').value = m.ahorrado;
+    document.getElementById('metaFecha').value    = m.fecha || '';
+    del.style.display = 'block';
+  } else {
+    document.getElementById('metaModalTitle').textContent = '🎯 Nueva Meta';
+    document.getElementById('metaNombre').value   = '';
+    document.getElementById('metaIcono').value    = '🎯';
+    document.getElementById('metaObjetivo').value = '';
+    document.getElementById('metaAhorrado').value = '';
+    document.getElementById('metaFecha').value    = '';
+    del.style.display = 'none';
+  }
+  document.getElementById('metaModal').classList.add('open');
+}
+
+function saveMeta() {
+  const nombre   = document.getElementById('metaNombre').value.trim();
+  const icono    = document.getElementById('metaIcono').value;
+  const objetivo = parseFloat(document.getElementById('metaObjetivo').value) || 0;
+  const ahorrado = parseFloat(document.getElementById('metaAhorrado').value) || 0;
+  const fecha    = document.getElementById('metaFecha').value;
+  if (!nombre)   { showToast('Ingresá un nombre', 'error'); return; }
+  if (!objetivo) { showToast('Ingresá un monto objetivo', 'error'); return; }
+
+  if (!state.metas) state.metas = [];
+  if (state.editingMetaId) {
+    const idx = state.metas.findIndex(x => x.id === state.editingMetaId);
+    if (idx !== -1) state.metas[idx] = { ...state.metas[idx], nombre, icono, objetivo, ahorrado, fecha };
+  } else {
+    state.metas.push({ id: uid(), nombre, icono, objetivo, ahorrado, fecha });
+  }
+  saveState();
+  closeModal('metaModal');
+  renderMetas();
+  showToast(state.editingMetaId ? 'Meta actualizada' : 'Meta creada 🎯');
+}
+
+function deleteMeta() {
+  if (!state.editingMetaId) return;
+  state.metas = state.metas.filter(x => x.id !== state.editingMetaId);
+  saveState();
+  closeModal('metaModal');
+  renderMetas();
+  showToast('Meta eliminada', 'error');
+}
+
+function ajustarMeta(id, delta) {
+  const m = state.metas.find(x => x.id === id);
+  if (!m) return;
+  m.ahorrado = Math.max(0, (m.ahorrado || 0) + delta);
+  saveState();
+  renderMetas();
+}
+
+function renderMetas() {
+  const el = document.getElementById('listMetas');
+  if (!el) return;
+  if (!state.metas) state.metas = [];
+
+  if (state.metas.length === 0) {
+    el.innerHTML = `<div class="empty"><div style="font-size:32px;margin-bottom:8px">🎯</div><div>No tenés metas todavía. Creá una con + Meta</div></div>`;
+    return;
+  }
+
+  el.innerHTML = state.metas.map(m => {
+    const pct = m.objetivo > 0 ? Math.min(100, Math.round((m.ahorrado / m.objetivo) * 100)) : 0;
+    const completa = pct >= 100;
+    const restante = Math.max(0, m.objetivo - m.ahorrado);
+    const color = completa ? 'var(--accent2)' : pct >= 66 ? 'var(--accent)' : pct >= 33 ? 'var(--yellow)' : 'var(--red)';
+
+    // Días restantes si hay fecha
+    let fechaInfo = '';
+    if (m.fecha) {
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      const fin = new Date(m.fecha + 'T00:00:00');
+      const dias = Math.ceil((fin - hoy) / (1000*60*60*24));
+      if (dias > 0 && !completa) {
+        const porDia = restante / dias;
+        fechaInfo = `<div style="font-size:11px;color:var(--muted);margin-top:6px">📅 ${dias} días · necesitás ${fmt(Math.ceil(porDia))}/día</div>`;
+      } else if (dias <= 0 && !completa) {
+        fechaInfo = `<div style="font-size:11px;color:var(--red);margin-top:6px">⚠️ Venció el plazo</div>`;
+      }
+    }
+
+    return `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div style="font-size:26px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border-radius:12px;flex-shrink:0;cursor:pointer" onclick="openMetaModal('${m.id}')">${m.icono || '🎯'}</div>
+        <div style="flex:1;min-width:0;cursor:pointer" onclick="openMetaModal('${m.id}')">
+          <div style="font-size:15px;font-weight:600;color:var(--text)">${m.nombre}</div>
+          <div style="font-size:12px;color:var(--muted)">${fmt(m.ahorrado)} de ${fmt(m.objetivo)}</div>
+        </div>
+        ${completa ? '<span style="font-size:11px;background:rgba(53,241,160,.15);color:var(--accent2);padding:3px 10px;border-radius:8px;font-weight:700">✓ Lograda</span>' : `<span style="font-size:16px;font-weight:700;color:${color}">${pct}%</span>`}
+      </div>
+      <div style="height:10px;background:var(--surface2);border-radius:6px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${color};border-radius:6px;transition:width .5s"></div>
+      </div>
+      ${!completa ? `<div style="font-size:12px;color:var(--muted);margin-top:8px">Te faltan <b style="color:var(--text)">${fmt(restante)}</b></div>` : ''}
+      ${fechaInfo}
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button onclick="ajustarMeta('${m.id}',-1000)" style="flex:1;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">− $1.000</button>
+        <button onclick="ajustarMeta('${m.id}',1000)" style="flex:1;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--accent2);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">+ $1.000</button>
+        <button onclick="ajustarMeta('${m.id}',5000)" style="flex:1;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--accent2);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">+ $5.000</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ========== PIN DE BLOQUEO ==========
+let pinBuffer = '';
+let pinMode = 'unlock'; // 'unlock' | 'set' | 'confirm'
+let pinFirstEntry = '';
+
+function buildPinPad() {
+  const pad = document.getElementById('pinPad');
+  if (!pad) return;
+  pad.innerHTML =
+    [1,2,3,4,5,6,7,8,9].map(n=>`<button class="pin-key" onclick="pinPress('${n}')">${n}</button>`).join('') +
+    `<div></div><button class="pin-key" onclick="pinPress('0')">0</button><button class="pin-key" onclick="pinDelete()" style="font-size:20px">⌫</button>`;
+}
+
+function updatePinDots(error) {
+  const dots = document.querySelectorAll('#pinDots .pin-dot');
+  dots.forEach((d, i) => {
+    d.classList.toggle('filled', i < pinBuffer.length);
+    d.classList.toggle('error', !!error);
+  });
+}
+
+function pinPress(n) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += n;
+  updatePinDots(false);
+  if (pinBuffer.length === 4) setTimeout(procesarPin, 150);
+}
+
+function pinDelete() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updatePinDots(false);
+}
+
+function procesarPin() {
+  if (pinMode === 'unlock') {
+    if (pinBuffer === state.pin) {
+      document.getElementById('pinLockOverlay').style.display = 'none';
+      pinBuffer = '';
+    } else {
+      updatePinDots(true);
+      setTimeout(() => { pinBuffer = ''; updatePinDots(false); }, 500);
+    }
+  } else if (pinMode === 'set') {
+    pinFirstEntry = pinBuffer;
+    pinBuffer = '';
+    pinMode = 'confirm';
+    document.getElementById('pinLockMsg').textContent = 'Repetí el PIN para confirmar';
+    updatePinDots(false);
+  } else if (pinMode === 'confirm') {
+    if (pinBuffer === pinFirstEntry) {
+      state.pin = pinBuffer;
+      saveState();
+      document.getElementById('pinLockOverlay').style.display = 'none';
+      pinBuffer = '';
+      showToast('PIN activado 🔒');
+      updatePinStatus();
+    } else {
+      updatePinDots(true);
+      document.getElementById('pinLockMsg').textContent = 'No coincide. Empezá de nuevo';
+      setTimeout(() => {
+        pinBuffer = ''; pinFirstEntry = ''; pinMode = 'set';
+        document.getElementById('pinLockMsg').textContent = 'Elegí un PIN de 4 dígitos';
+        updatePinDots(false);
+      }, 800);
+    }
+  }
+}
+
+function configurarPin() {
+  if (state.pin) {
+    // Ya tiene PIN → desactivar
+    if (confirm('¿Desactivar el PIN de bloqueo?')) {
+      state.pin = null;
+      saveState();
+      updatePinStatus();
+      showToast('PIN desactivado');
+    }
+  } else {
+    // Configurar nuevo
+    closeModal('settingsModal');
+    pinMode = 'set';
+    pinBuffer = '';
+    pinFirstEntry = '';
+    buildPinPad();
+    document.getElementById('pinLockMsg').textContent = 'Elegí un PIN de 4 dígitos';
+    document.getElementById('pinLockOverlay').style.display = 'flex';
+    updatePinDots(false);
+  }
+}
+
+function updatePinStatus() {
+  const st = document.getElementById('pinStatus');
+  const btn = document.getElementById('pinToggleBtn');
+  if (!st || !btn) return;
+  if (state.pin) {
+    st.textContent = '✅ PIN activado. Se pedirá cada vez que abras la app.';
+    btn.textContent = 'Desactivar PIN';
+    btn.style.background = 'rgba(255,94,94,.1)';
+    btn.style.color = 'var(--red)';
+    btn.style.border = '1px solid rgba(255,94,94,.25)';
+  } else {
+    st.textContent = 'Protegé tus finanzas con un PIN de 4 dígitos que se pide al abrir la app.';
+    btn.textContent = 'Activar PIN de bloqueo';
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.border = '';
+  }
+}
+
+function checkPinOnStart() {
+  if (state.pin) {
+    pinMode = 'unlock';
+    pinBuffer = '';
+    buildPinPad();
+    document.getElementById('pinLockMsg').textContent = 'Ingresá tu PIN';
+    document.getElementById('pinLockOverlay').style.display = 'flex';
+    updatePinDots(false);
+  }
+}
+
 // ========== INIT ==========
 loadState();
 render();
+checkPinOnStart(); // Pedir PIN si está activado
 fetchDolar(); // Obtener cotización al arrancar
 setTimeout(() => {
   const active = document.querySelector('.month-chip.active');
