@@ -588,6 +588,22 @@
   }
   .fab:active { transform: scale(.93); }
 
+  /* ===== SUB-NAV ===== */
+  .sub-nav {
+    display: flex; gap: 6px; margin-bottom: 16px;
+    background: var(--surface2); padding: 4px; border-radius: 12px;
+  }
+  .sub-nav-btn {
+    flex: 1; padding: 9px 4px; border: none; border-radius: 9px;
+    background: transparent; color: var(--muted); font-size: 13px;
+    font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer;
+    transition: all .2s; white-space: nowrap;
+  }
+  .sub-nav-btn.active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .sub-tab { display: none; }
+  .sub-tab.active { display: block; animation: fadeIn .2s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
   /* ===== TOAST ===== */
   #toastContainer {
     position: fixed; bottom: calc(60px + 80px); left: 50%;
@@ -773,6 +789,7 @@
 <div class="content">
   <!-- TAB 1: INICIO -->
   <div class="tab active" id="tab-inicio">
+    <div id="insightBanner"></div>
     <div id="yearBars"></div>
     <div class="summary-banner" id="homeBanner">
       <div class="sum-item">
@@ -846,6 +863,7 @@
       <button class="add-btn" onclick="openStockModal()">+ Producto</button>
     </div>
     <div id="stockResumen"></div>
+    <button id="btnListaCompras" onclick="openListaCompras()" style="display:none;width:100%;background:linear-gradient(135deg,rgba(255,94,94,.12),rgba(247,208,56,.08));border:1px solid rgba(255,94,94,.3);color:var(--red);border-radius:14px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:14px">🛒 Armar lista de compras</button>
     <div id="listStock"></div>
   </div>
 
@@ -886,27 +904,41 @@
 
   <!-- TAB 5: ALERTAS -->
   <div class="tab" id="tab-alertas">
-    <div class="section-title">
-      <span>🔔 Mis Alertas</span>
-      <button class="add-btn" onclick="openAlertaModal()">+ Alerta</button>
+    <!-- Sub-navegación -->
+    <div class="sub-nav">
+      <button class="sub-nav-btn active" id="subnav-alertas" onclick="switchSubTab('alertas')">🔔 Alertas</button>
+      <button class="sub-nav-btn" id="subnav-programados" onclick="switchSubTab('programados')">📅 Programados</button>
+      <button class="sub-nav-btn" id="subnav-hormiga" onclick="switchSubTab('hormiga')">🐜 Hormiga</button>
     </div>
-    <div id="alertasTriggeradas" style="margin-bottom:8px"></div>
-    <div id="listAlertas"></div>
 
-    <!-- GASTOS PROGRAMADOS -->
-    <div class="section-title" style="margin-top:20px">
-      <span>📅 Gastos Programados</span>
-      <button class="add-btn" onclick="openGastoProgramadoModal()">+ Agregar</button>
+    <!-- SUB: ALERTAS -->
+    <div class="sub-tab active" id="subtab-alertas">
+      <div class="section-title">
+        <span>🔔 Mis Alertas</span>
+        <button class="add-btn" onclick="openAlertaModal()">+ Alerta</button>
+      </div>
+      <div id="alertasTriggeradas" style="margin-bottom:8px"></div>
+      <div id="listAlertas"></div>
     </div>
-    <div id="resumenGastosProgramados"></div>
-    <div id="listGastosProgramados"></div>
 
-    <!-- GASTOS HORMIGA -->
-    <div class="section-title" style="margin-top:20px">
-      <span>🐜 Gastos Hormiga</span>
-      <span id="hormigaLimiteLabel" style="font-size:12px;color:var(--muted)"></span>
+    <!-- SUB: GASTOS PROGRAMADOS -->
+    <div class="sub-tab" id="subtab-programados">
+      <div class="section-title">
+        <span>📅 Gastos Programados</span>
+        <button class="add-btn" onclick="openGastoProgramadoModal()">+ Agregar</button>
+      </div>
+      <div id="resumenGastosProgramados"></div>
+      <div id="listGastosProgramados"></div>
     </div>
-    <div id="resumenHormiga"></div>
+
+    <!-- SUB: GASTOS HORMIGA -->
+    <div class="sub-tab" id="subtab-hormiga">
+      <div class="section-title">
+        <span>🐜 Gastos Hormiga</span>
+        <span id="hormigaLimiteLabel" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div id="resumenHormiga"></div>
+    </div>
   </div>
 </div>
 
@@ -1015,7 +1047,8 @@
     </div>
     <div class="form-group">
       <label>Concepto</label>
-      <input id="txConcepto" placeholder="Ej: Sueldo, Supermercado, Alquiler..." />
+      <input id="txConcepto" list="conceptosList" placeholder="Ej: Sueldo, Supermercado, Alquiler..." autocomplete="off" />
+      <datalist id="conceptosList"></datalist>
     </div>
 
     <!-- Campos normales ingreso/gasto -->
@@ -1073,7 +1106,14 @@
     </div>
     <div class="form-group">
       <label>Monto</label>
-      <input id="txMonto" type="number" placeholder="0.00" min="0" step="0.01" />
+      <input id="txMonto" type="number" inputmode="decimal" placeholder="0" min="0" step="0.01" />
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <button type="button" onclick="sumarMonto(1000)" style="flex:1;min-width:52px;padding:7px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">+1k</button>
+        <button type="button" onclick="sumarMonto(5000)" style="flex:1;min-width:52px;padding:7px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">+5k</button>
+        <button type="button" onclick="sumarMonto(10000)" style="flex:1;min-width:52px;padding:7px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">+10k</button>
+        <button type="button" onclick="redondearMonto()" style="flex:1;min-width:52px;padding:7px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--yellow);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">⌀ redondear</button>
+        <button type="button" onclick="limpiarMonto()" style="flex:1;min-width:52px;padding:7px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">✕ C</button>
+      </div>
     </div>
     <div class="form-group">
       <label>Comprobante (foto o PDF)</label>
@@ -1316,6 +1356,16 @@
         <input id="stkNombre" placeholder="Ej: Fideos, Aceite, Arroz..." />
       </div>
       <div class="form-group">
+        <label>Ubicación</label>
+        <select id="stkUbicacion">
+          <option value="cocina">🍳 Cocina</option>
+          <option value="bano">🚿 Baño</option>
+          <option value="pieza">🛏 Pieza</option>
+          <option value="lavanderia">🧺 Lavandería</option>
+          <option value="general">🏠 General</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Categoría</label>
         <select id="stkCategoria">
           <option value="🥫">🥫 Almacén</option>
@@ -1376,6 +1426,56 @@
   </div>
 </div>
 
+<!-- MODAL LISTA DE COMPRAS -->
+<div class="modal-overlay" id="listaComprasModal" onclick="if(event.target===this)closeModal('listaComprasModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span>🛒 Lista de Compras</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button onclick="compartirListaCompras()" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px" title="Compartir">📤</button>
+          <div class="modal-close" onclick="closeModal('listaComprasModal')">✕</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-body" id="listaComprasBody"></div>
+  </div>
+</div>
+
+<!-- MODAL REPONER STOCK -->
+<div class="modal-overlay" id="reponerStockModal" onclick="if(event.target===this)closeModal('reponerStockModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span>🛒 ¿Reponés stock?</span>
+        <div class="modal-close" onclick="closeModal('reponerStockModal')">✕</div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Marcá los productos que compraste y sumá cuánto agregar a tu despensa.</div>
+      <div id="reponerStockBody"></div>
+      <button class="submit-btn" onclick="aplicarReposicion()" style="margin-top:8px">Actualizar stock</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CARGAR GASTO PROGRAMADO -->
+<div class="modal-overlay" id="cargarGastoProgModal" onclick="if(event.target===this)cancelarCargarGastoProg()">
+  <div class="modal" style="max-width:340px">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span>✅ Pagado</span>
+        <div class="modal-close" onclick="cancelarCargarGastoProg()">✕</div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div id="cargarGastoProgTexto" style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:18px"></div>
+      <button class="submit-btn" onclick="confirmarCargarGastoProg()">Sí, registrar gasto</button>
+      <button onclick="cancelarCargarGastoProg()" style="width:100%;margin-top:8px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:12px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">No, solo marcar pagado</button>
+    </div>
+  </div>
+</div>
+
 <div class="viewer-overlay" id="viewerOverlay">
   <div class="viewer-header">
     <span class="viewer-title" id="viewerTitle">Comprobante</span>
@@ -1411,6 +1511,7 @@ let state = {
   mealPlan: {},
   editingStockId: null,
   editingRecetaId: null,
+  lastOrigenId: null,
   driveScriptUrl: '',
   cotizProxyUrl: ''
 };
@@ -1428,6 +1529,7 @@ function loadState() {
       state.stock               = parsed.stock               || [];
       state.recetas             = parsed.recetas             || [];
       state.mealPlan            = parsed.mealPlan            || {};
+      state.lastOrigenId        = parsed.lastOrigenId        || null;
       state.umbralHormiga       = parsed.umbralHormiga       ?? 5000;
       state.driveScriptUrl      = parsed.driveScriptUrl      || '';
       state.cotizProxyUrl       = parsed.cotizProxyUrl       || '';
@@ -1457,6 +1559,7 @@ function saveState() {
       stock:             state.stock,
       recetas:           state.recetas,
       mealPlan:          state.mealPlan,
+      lastOrigenId:      state.lastOrigenId,
       umbralHormiga:     state.umbralHormiga,
       driveScriptUrl:    state.driveScriptUrl,
       cotizProxyUrl:     state.cotizProxyUrl
@@ -1779,6 +1882,84 @@ function renderYearBars() {
 function goToMonth(m) {
   state.currentMonth = m;
   render();
+}
+
+// ========== INSIGHTS (mini-resumen inteligente) ==========
+function renderInsights() {
+  const el = document.getElementById('insightBanner');
+  if (!el) return;
+
+  const insights = [];
+
+  // 1. Comparación con mes anterior
+  const txMesActual = getTxsForMonth(state.currentMonth, state.currentYear)
+    .filter(t => t.type === 'expense');
+  const gastoActual = txMesActual.reduce((s,t) => s + t.monto, 0);
+
+  let mesAnt = state.currentMonth - 1, anioAnt = state.currentYear;
+  if (mesAnt < 0) { mesAnt = 11; anioAnt--; }
+  const gastoAnterior = getTxsForMonth(mesAnt, anioAnt)
+    .filter(t => t.type === 'expense')
+    .reduce((s,t) => s + t.monto, 0);
+
+  if (gastoAnterior > 0 && gastoActual > 0) {
+    const dif = Math.round(((gastoActual - gastoAnterior) / gastoAnterior) * 100);
+    if (Math.abs(dif) >= 5) {
+      insights.push({
+        icon: dif > 0 ? '📈' : '📉',
+        color: dif > 0 ? 'var(--red)' : 'var(--accent2)',
+        text: dif > 0
+          ? `Gastaste <b>${dif}% más</b> que el mes pasado`
+          : `Gastaste <b>${Math.abs(dif)}% menos</b> que el mes pasado 👏`
+      });
+    }
+  }
+
+  // 2. Gastos programados sin pagar este mes
+  const mesKey = `${state.currentYear}-${state.currentMonth}`;
+  const sinPagar = (state.gastosProgramados || []).filter(g => !g.pagadoMeses?.[mesKey]);
+  if (sinPagar.length > 0 && state.currentMonth === new Date().getMonth() && state.currentYear === new Date().getFullYear()) {
+    const totalSinPagar = sinPagar.reduce((s,g) => s + g.monto, 0);
+    insights.push({
+      icon: '📅',
+      color: 'var(--yellow)',
+      text: `Tenés <b>${sinPagar.length} gasto${sinPagar.length !== 1 ? 's' : ''} programado${sinPagar.length !== 1 ? 's' : ''}</b> sin pagar (${fmt(totalSinPagar)})`
+    });
+  }
+
+  // 3. Productos a comprar en el stock
+  const aComprar = (state.stock || []).filter(i => stockNivel(i) === 'rojo');
+  if (aComprar.length > 0) {
+    insights.push({
+      icon: '🛒',
+      color: 'var(--red)',
+      text: `Te faltan <b>${aComprar.length} producto${aComprar.length !== 1 ? 's' : ''}</b> en la despensa`
+    });
+  }
+
+  // 4. Balance del mes (ritmo de gasto)
+  const ingresoActual = getTxsForMonth(state.currentMonth, state.currentYear)
+    .filter(t => t.type === 'income')
+    .reduce((s,t) => s + t.monto, 0);
+  if (ingresoActual > 0 && gastoActual > 0) {
+    const restante = ingresoActual - gastoActual;
+    if (restante < 0) {
+      insights.push({
+        icon: '⚠️',
+        color: 'var(--red)',
+        text: `Este mes gastaste <b>${fmt(Math.abs(restante))} más</b> de lo que ingresó`
+      });
+    }
+  }
+
+  if (insights.length === 0) { el.innerHTML = ''; return; }
+
+  // Mostrar hasta 2 insights más relevantes
+  el.innerHTML = insights.slice(0, 2).map(ins => `
+    <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--surface);border:1px solid var(--border);border-left:3px solid ${ins.color};border-radius:12px;margin-bottom:8px">
+      <span style="font-size:18px">${ins.icon}</span>
+      <span style="font-size:13px;color:var(--text);line-height:1.4">${ins.text}</span>
+    </div>`).join('');
 }
 
 function renderInicio() {
@@ -2656,6 +2837,8 @@ function openModal(type) {
   document.getElementById('txCategoria').value = '';
   document.getElementById('txMontoUSD').value = '';
   document.getElementById('grupUSD').style.display = 'none';
+  // Autocomplete de conceptos usados antes (según tipo)
+  poblarConceptosAutocomplete(state.txType);
   // Default fecha = hoy
   const hoy = new Date();
   const yyyy = hoy.getFullYear();
@@ -2668,7 +2851,25 @@ function openModal(type) {
   // updateTxTypeUI y populateCuentaSelect al final — manejan grupOrigen correctamente
   updateTxTypeUI();
   populateCuentaSelect();
+  // Recordar última cuenta origen usada (gastos)
+  if (state.txType === 'expense' && state.lastOrigenId) {
+    const selOrigen = document.getElementById('txOrigen');
+    if (selOrigen && [...selOrigen.options].some(o => o.value === state.lastOrigenId)) {
+      selOrigen.value = state.lastOrigenId;
+    }
+  }
   document.getElementById('txModal').classList.add('open');
+}
+
+function poblarConceptosAutocomplete(tipo) {
+  const dl = document.getElementById('conceptosList');
+  if (!dl) return;
+  const conceptos = [...new Set(
+    state.transactions
+      .filter(t => t.type === tipo && t.concepto)
+      .map(t => t.concepto.trim())
+  )].sort();
+  dl.innerHTML = conceptos.map(c => `<option value="${c.replace(/"/g,'&quot;')}">`).join('');
 }
 
 function editTx(id) {
@@ -2713,6 +2914,23 @@ function editTx(id) {
     document.getElementById('txOrigen').value = t.origenId || '';
   }
   document.getElementById('txModal').classList.add('open');
+}
+
+// ========== HELPERS DE MONTO ==========
+function sumarMonto(n) {
+  const inp = document.getElementById('txMonto');
+  const val = parseFloat(inp.value) || 0;
+  inp.value = val + n;
+  if (typeof convertUSDtoARS === 'function') convertUSDtoARS();
+}
+function redondearMonto() {
+  const inp = document.getElementById('txMonto');
+  const val = parseFloat(inp.value) || 0;
+  inp.value = Math.round(val);
+  if (typeof convertUSDtoARS === 'function') convertUSDtoARS();
+}
+function limpiarMonto() {
+  document.getElementById('txMonto').value = '';
 }
 
 function openFabMenu() {
@@ -3091,10 +3309,21 @@ function saveTx() {
 
   const wasEditing = !!state.editingTxId;
   const savedType = state.txType;
+  // Recordar última cuenta origen para próximo gasto
+  if (savedType === 'expense' && origenId) state.lastOrigenId = origenId;
+  // Detectar si es gasto de comida para ofrecer reponer stock
+  const cuentaGasto = state.cuentas.find(c => c.id === cuentaId);
+  const esComida = savedType === 'expense' && cuentaGasto && cuentaGasto.tipo === 'gasto_comida';
+
   saveState();
   closeModal('txModal');
   render();
   showToast(wasEditing ? 'Movimiento actualizado' : (savedType === 'income' ? 'Ingreso guardado' : 'Gasto guardado'));
+
+  // Ofrecer reponer stock tras un gasto de comida (solo si hay productos y no es edición)
+  if (esComida && !wasEditing && state.stock && state.stock.length > 0) {
+    setTimeout(() => openReponerStock(), 400);
+  }
 
   if (fileToUpload && state.driveScriptUrl) {
     uploadToDrive(fileToUpload, state.txType, concepto, txDate)
@@ -3170,6 +3399,15 @@ function deleteCuenta(id) {
 }
 
 // ========== TAB SWITCH ==========
+function switchSubTab(sub) {
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.sub-nav-btn').forEach(b => b.classList.remove('active'));
+  const t = document.getElementById('subtab-' + sub);
+  const b = document.getElementById('subnav-' + sub);
+  if (t) t.classList.add('active');
+  if (b) b.classList.add('active');
+}
+
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -3198,6 +3436,7 @@ function switchTab(tab) {
 function render() {
   renderMonthChips();
   renderYearBars();
+  renderInsights();
   renderInicio();
   renderResumen();
   renderCuentas();
@@ -3746,9 +3985,61 @@ function togglePagado(id) {
   if (!gp) return;
   if (!gp.pagadoMeses) gp.pagadoMeses = {};
   const mesKey = `${state.currentYear}-${state.currentMonth}`;
-  gp.pagadoMeses[mesKey] = !gp.pagadoMeses[mesKey];
+  const ahoraPagado = !gp.pagadoMeses[mesKey];
+  gp.pagadoMeses[mesKey] = ahoraPagado;
   saveState();
   renderGastosProgramados();
+
+  // Si lo acabo de marcar como pagado, ofrecer cargarlo como gasto real
+  if (ahoraPagado) {
+    // ¿Ya existe un gasto de este concepto este mes? evitar duplicar
+    const txsMes = getTxsForMonth(state.currentMonth, state.currentYear);
+    const yaCargado = txsMes.some(t =>
+      t.type === 'expense' && normalizeStr(t.concepto).includes(normalizeStr(gp.desc))
+    );
+    if (!yaCargado) {
+      pendingProgramado = gp;
+      document.getElementById('cargarGastoProgTexto').innerHTML =
+        `Marcaste <b>${gp.desc}</b> como pagado.<br>¿Lo registrás también como gasto de ${fmt(gp.monto)}?`;
+      document.getElementById('cargarGastoProgModal').classList.add('open');
+    }
+  }
+}
+
+let pendingProgramado = null;
+
+function confirmarCargarGastoProg() {
+  if (!pendingProgramado) return;
+  const gp = pendingProgramado;
+
+  // Buscar cuenta de gasto que matchee la categoría, o la primera de esa categoría
+  let cuentaGasto = state.cuentas.find(c =>
+    c.tipo === gp.categoria && normalizeStr(c.nombre).includes(normalizeStr(gp.desc))
+  ) || state.cuentas.find(c => c.tipo === gp.categoria);
+
+  // Si no hay cuenta de gasto de esa categoría, crearla
+  if (!cuentaGasto) {
+    cuentaGasto = { id: uid(), nombre: gp.desc, tipo: gp.categoria || 'gasto_otro', saldoInicial: 0 };
+    state.cuentas.push(cuentaGasto);
+  }
+
+  const hoy = new Date();
+  state.transactions.push({
+    id: uid(), type: 'expense', concepto: gp.desc, monto: gp.monto,
+    cuentaId: cuentaGasto.id, categoria: cuentaGasto.tipo,
+    origenId: state.lastOrigenId || null, montoUSD: null,
+    attachment: null, date: hoy.toISOString()
+  });
+  saveState();
+  closeModal('cargarGastoProgModal');
+  render();
+  showToast(`Gasto "${gp.desc}" registrado`);
+  pendingProgramado = null;
+}
+
+function cancelarCargarGastoProg() {
+  closeModal('cargarGastoProgModal');
+  pendingProgramado = null;
 }
 
 function pedirActualizarEstimado(id, realMonto) {
@@ -3884,6 +4175,7 @@ function openStockModal(id = null) {
     if (!s) return;
     document.getElementById('stockModalTitle').textContent = '✏️ Editar Producto';
     document.getElementById('stkNombre').value    = s.nombre;
+    document.getElementById('stkUbicacion').value = s.ubicacion || 'general';
     document.getElementById('stkCategoria').value = s.categoria || '🥫';
     document.getElementById('stkCantidad').value  = s.cantidad;
     document.getElementById('stkMinimo').value    = s.minimo;
@@ -3892,6 +4184,7 @@ function openStockModal(id = null) {
   } else {
     document.getElementById('stockModalTitle').textContent = '🥫 Nuevo Producto';
     document.getElementById('stkNombre').value    = '';
+    document.getElementById('stkUbicacion').value = 'cocina';
     document.getElementById('stkCategoria').value = '🥫';
     document.getElementById('stkCantidad').value  = '';
     document.getElementById('stkMinimo').value    = '';
@@ -3903,6 +4196,7 @@ function openStockModal(id = null) {
 
 function saveStock() {
   const nombre    = document.getElementById('stkNombre').value.trim();
+  const ubicacion = document.getElementById('stkUbicacion').value;
   const categoria = document.getElementById('stkCategoria').value;
   const cantidad  = parseFloat(document.getElementById('stkCantidad').value) || 0;
   const minimo    = parseFloat(document.getElementById('stkMinimo').value) || 0;
@@ -3912,9 +4206,9 @@ function saveStock() {
   if (!state.stock) state.stock = [];
   if (state.editingStockId) {
     const idx = state.stock.findIndex(x => x.id === state.editingStockId);
-    if (idx !== -1) state.stock[idx] = { ...state.stock[idx], nombre, categoria, cantidad, minimo, unidad };
+    if (idx !== -1) state.stock[idx] = { ...state.stock[idx], nombre, ubicacion, categoria, cantidad, minimo, unidad };
   } else {
-    state.stock.push({ id: uid(), nombre, categoria, cantidad, minimo, unidad });
+    state.stock.push({ id: uid(), nombre, ubicacion, categoria, cantidad, minimo, unidad });
   }
   saveState();
   closeModal('stockModal');
@@ -3939,6 +4233,149 @@ function ajustarStock(id, delta) {
   renderStock();
 }
 
+// ========== LISTA DE COMPRAS ==========
+function openListaCompras() {
+  const faltantes = state.stock.filter(i => stockNivel(i) !== 'verde'); // rojo + amarillo
+  const body = document.getElementById('listaComprasBody');
+
+  if (faltantes.length === 0) {
+    body.innerHTML = `<div class="empty"><div style="font-size:32px;margin-bottom:8px">✅</div><div>No falta nada. Tu despensa está completa.</div></div>`;
+    document.getElementById('listaComprasModal').classList.add('open');
+    return;
+  }
+
+  const UBIC = {
+    cocina: '🍳 Cocina', bano: '🚿 Baño', pieza: '🛏 Pieza',
+    lavanderia: '🧺 Lavandería', general: '🏠 General'
+  };
+  const ubicOrder = ['cocina','bano','pieza','lavanderia','general'];
+
+  let html = `<div style="font-size:12px;color:var(--muted);margin-bottom:14px">${faltantes.length} producto${faltantes.length !== 1 ? 's' : ''} para reponer. Tocá para marcar lo que ya compraste.</div>`;
+
+  ubicOrder.forEach(ub => {
+    const items = faltantes.filter(i => (i.ubicacion || 'general') === ub);
+    if (items.length === 0) return;
+    html += `<div style="font-size:12px;font-weight:700;color:var(--text);margin:14px 0 8px">${UBIC[ub]}</div>`;
+    html += items.map(i => {
+      const nivel = stockNivel(i);
+      const dot = nivel === 'rojo' ? 'var(--red)' : 'var(--yellow)';
+      return `<div onclick="toggleCompraCheck(this,'${i.id}')" data-comprado="0" style="display:flex;align-items:center;gap:12px;padding:11px 12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer">
+        <div class="compra-check" style="width:22px;height:22px;border-radius:6px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s"></div>
+        <span style="font-size:16px">${i.categoria || '🥫'}</span>
+        <div style="flex:1">
+          <div class="compra-nombre" style="font-size:14px;font-weight:500;color:var(--text)">${i.nombre}</div>
+          <div style="font-size:11px;color:${dot}">${nivel === 'rojo' ? 'Sin stock' : `Quedan ${i.cantidad}${i.unidad ? ' '+i.unidad : ''}`}</div>
+        </div>
+      </div>`;
+    }).join('');
+  });
+
+  body.innerHTML = html;
+  document.getElementById('listaComprasModal').classList.add('open');
+}
+
+function toggleCompraCheck(el, id) {
+  const comprado = el.dataset.comprado === '1';
+  el.dataset.comprado = comprado ? '0' : '1';
+  const check  = el.querySelector('.compra-check');
+  const nombre = el.querySelector('.compra-nombre');
+  if (!comprado) {
+    check.style.background = 'var(--accent2)';
+    check.style.borderColor = 'var(--accent2)';
+    check.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    nombre.style.textDecoration = 'line-through';
+    nombre.style.color = 'var(--muted)';
+    el.style.opacity = '.6';
+  } else {
+    check.style.background = 'transparent';
+    check.style.borderColor = 'var(--border)';
+    check.innerHTML = '';
+    nombre.style.textDecoration = 'none';
+    nombre.style.color = 'var(--text)';
+    el.style.opacity = '1';
+  }
+}
+
+function compartirListaCompras() {
+  const faltantes = state.stock.filter(i => stockNivel(i) !== 'verde');
+  if (faltantes.length === 0) { showToast('No hay nada para comprar', 'info'); return; }
+
+  const UBIC = { cocina: 'Cocina', bano: 'Baño', pieza: 'Pieza', lavanderia: 'Lavandería', general: 'General' };
+  const ubicOrder = ['cocina','bano','pieza','lavanderia','general'];
+
+  let texto = '🛒 LISTA DE COMPRAS\n\n';
+  ubicOrder.forEach(ub => {
+    const items = faltantes.filter(i => (i.ubicacion || 'general') === ub);
+    if (items.length === 0) return;
+    texto += `📍 ${UBIC[ub]}\n`;
+    items.forEach(i => { texto += `  • ${i.nombre}\n`; });
+    texto += '\n';
+  });
+
+  if (navigator.share) {
+    navigator.share({ title: 'Lista de Compras', text: texto }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(texto).then(() => showToast('Lista copiada al portapapeles'));
+  }
+}
+
+// ========== REPONER STOCK DESDE GASTO ==========
+function openReponerStock() {
+  const body = document.getElementById('reponerStockBody');
+  if (!body) return;
+
+  // Priorizar productos que están faltando (rojo/amarillo), luego el resto
+  const ordenados = [...state.stock].sort((a, b) => {
+    const peso = { rojo: 0, amarillo: 1, verde: 2 };
+    return peso[stockNivel(a)] - peso[stockNivel(b)];
+  });
+
+  body.innerHTML = ordenados.map(i => {
+    const nivel = stockNivel(i);
+    const color = nivel === 'rojo' ? 'var(--red)' : nivel === 'amarillo' ? 'var(--yellow)' : 'var(--accent2)';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-left:3px solid ${color};border-radius:12px;margin-bottom:6px">
+      <span style="font-size:18px">${i.categoria || '🥫'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;color:var(--text)">${i.nombre}</div>
+        <div style="font-size:10px;color:var(--muted)">Tenés ${i.cantidad}${i.unidad ? ' '+i.unidad : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px">
+        <button onclick="repoAjustar('${i.id}',-1)" style="width:28px;height:28px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer">−</button>
+        <span id="repo_${i.id}" data-add="0" style="min-width:24px;text-align:center;font-size:14px;font-weight:700;color:var(--accent2)">0</span>
+        <button onclick="repoAjustar('${i.id}',1)" style="width:28px;height:28px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer">+</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('reponerStockModal').classList.add('open');
+}
+
+function repoAjustar(id, delta) {
+  const el = document.getElementById('repo_' + id);
+  if (!el) return;
+  let val = parseInt(el.dataset.add || '0') + delta;
+  val = Math.max(0, val);
+  el.dataset.add = val;
+  el.textContent = '+' + val;
+  el.style.color = val > 0 ? 'var(--accent2)' : 'var(--muted)';
+  if (val === 0) el.textContent = '0';
+}
+
+function aplicarReposicion() {
+  let cambios = 0;
+  state.stock.forEach(i => {
+    const el = document.getElementById('repo_' + i.id);
+    if (el) {
+      const add = parseInt(el.dataset.add || '0');
+      if (add > 0) { i.cantidad = (i.cantidad || 0) + add; cambios++; }
+    }
+  });
+  saveState();
+  closeModal('reponerStockModal');
+  renderStock();
+  if (cambios > 0) showToast(`Stock actualizado (${cambios} producto${cambios !== 1 ? 's' : ''})`);
+}
+
 function renderStock() {
   if (!state.stock) state.stock = [];
   const resEl  = document.getElementById('stockResumen');
@@ -3955,6 +4392,14 @@ function renderStock() {
   const rojos     = items.filter(i => stockNivel(i) === 'rojo');
   const amarillos = items.filter(i => stockNivel(i) === 'amarillo');
   const verdes    = items.filter(i => stockNivel(i) === 'verde');
+
+  // Mostrar botón de lista de compras si hay faltantes
+  const btnLista = document.getElementById('btnListaCompras');
+  if (btnLista) {
+    const nFaltantes = rojos.length + amarillos.length;
+    btnLista.style.display = nFaltantes > 0 ? 'block' : 'none';
+    btnLista.innerHTML = `🛒 Armar lista de compras (${nFaltantes})`;
+  }
 
   // Resumen arriba
   resEl.innerHTML = `
@@ -3993,18 +4438,37 @@ function renderStock() {
   };
 
   let html = '';
-  if (rojos.length) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.5px;margin:4px 0 8px">🔴 A comprar</div>`;
-    html += rojos.map(renderItem).join('');
-  }
-  if (amarillos.length) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px">🟡 Por agotarse</div>`;
-    html += amarillos.map(renderItem).join('');
-  }
-  if (verdes.length) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px">🟢 En stock</div>`;
-    html += verdes.map(renderItem).join('');
-  }
+
+  // Agrupar por ubicación
+  const UBIC = {
+    cocina:     { icon: '🍳', label: 'Cocina' },
+    bano:       { icon: '🚿', label: 'Baño' },
+    pieza:      { icon: '🛏', label: 'Pieza' },
+    lavanderia: { icon: '🧺', label: 'Lavandería' },
+    general:    { icon: '🏠', label: 'General' },
+  };
+  const ubicOrder = ['cocina','bano','pieza','lavanderia','general'];
+
+  // Orden por nivel dentro de cada ambiente: rojo → amarillo → verde
+  const nivelPeso = { rojo: 0, amarillo: 1, verde: 2 };
+
+  ubicOrder.forEach(ub => {
+    const delAmbiente = items
+      .filter(i => (i.ubicacion || 'general') === ub)
+      .sort((a, b) => nivelPeso[stockNivel(a)] - nivelPeso[stockNivel(b)]);
+    if (delAmbiente.length === 0) return;
+
+    const info = UBIC[ub];
+    const nAComprar = delAmbiente.filter(i => stockNivel(i) === 'rojo').length;
+    html += `<div style="display:flex;align-items:center;gap:8px;margin:18px 0 10px">
+      <span style="font-size:16px">${info.icon}</span>
+      <span style="font-size:14px;font-weight:700;color:var(--text)">${info.label}</span>
+      ${nAComprar > 0 ? `<span style="font-size:10px;background:rgba(255,94,94,.15);color:var(--red);padding:2px 8px;border-radius:6px;font-weight:600">${nAComprar} a comprar</span>` : ''}
+      <span style="flex:1;height:1px;background:var(--border)"></span>
+    </div>`;
+    html += delAmbiente.map(renderItem).join('');
+  });
+
   listEl.innerHTML = html;
 }
 
