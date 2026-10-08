@@ -1337,14 +1337,15 @@
         <label>Descripción</label>
         <input id="gpDesc" placeholder="Ej: Teléfono, Club, Cochera..." />
       </div>
-      <div class="form-group">
+      <div class="form-group" id="gpMontoWrap">
         <label>Monto estimado</label>
         <input id="gpMonto" type="number" placeholder="0.00" min="0" step="0.01" />
       </div>
       <div class="form-group">
         <label>Categoría</label>
-        <select id="gpCategoria">
+        <select id="gpCategoria" onchange="onGpCategoriaChange()">
           <option value="gasto_otro">🗂 Otro</option>
+          <option value="tarjeta_credito">💳 Tarjeta de Crédito</option>
           <option value="gasto_alquiler">🏠 Alquiler / Vivienda</option>
           <option value="gasto_auto">🚗 Auto / Transporte</option>
           <option value="gasto_comida">🛒 Comida / Supermercado</option>
@@ -1357,6 +1358,9 @@
           <option value="gasto_viajes">✈️ Viajes / Vacaciones</option>
         </select>
       </div>
+      <div id="gpTarjetaNota" style="display:none;font-size:12px;color:#64b4ff;background:rgba(100,180,255,.08);border:1px solid rgba(100,180,255,.2);border-radius:10px;padding:10px 12px;margin-bottom:14px">
+        💳 El monto se calcula solo sumando los consumos. Guardá primero y después cargá cada consumo tocando la tarjeta.
+      </div>
       <div class="form-group">
         <label>Día de pago del mes <span style="color:var(--muted);font-size:11px">(1 al 31)</span></label>
         <input id="gpDiaPago" type="number" placeholder="Ej: 10" min="1" max="31" step="1" />
@@ -1364,6 +1368,70 @@
       </div>
       <button class="submit-btn" onclick="saveGastoProgramado()">Guardar</button>
       <button class="modal-delete-btn" id="gpDeleteBtn" onclick="deleteGastoProgramado()" style="display:none">🗑 Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONSUMOS DE TARJETA -->
+<div class="modal-overlay" id="consumosModal" onclick="if(event.target===this)closeModal('consumosModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span id="consumosTitle">💳 Consumos</span>
+        <div class="modal-close" onclick="closeModal('consumosModal')">✕</div>
+      </div>
+    </div>
+    <div class="modal-body" id="consumosBody"></div>
+  </div>
+</div>
+
+<!-- MODAL AGREGAR/EDITAR CONSUMO -->
+<div class="modal-overlay" id="consumoFormModal" onclick="if(event.target===this)closeModal('consumoFormModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span id="consumoFormTitle">➕ Nuevo Consumo</span>
+        <div class="modal-close" onclick="closeModal('consumoFormModal')">✕</div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Descripción</label>
+        <input id="cnDesc" placeholder="Ej: Netflix, Zapatillas, Heladera..." />
+      </div>
+      <div class="form-group">
+        <label>Tipo</label>
+        <div style="display:flex;gap:8px">
+          <div class="cn-tipo-btn" data-tipo="unico" onclick="setConsumoTipo('unico')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);text-align:center;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);transition:all .2s">🔁 Mensual fijo</div>
+          <div class="cn-tipo-btn" data-tipo="cuotas" onclick="setConsumoTipo('cuotas')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);text-align:center;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);transition:all .2s">💳 En cuotas</div>
+        </div>
+        <input type="hidden" id="cnTipo" value="unico" />
+      </div>
+      <!-- Mensual fijo -->
+      <div class="form-group" id="cnMontoWrap">
+        <label>Monto mensual</label>
+        <input id="cnMonto" type="number" placeholder="0" min="0" step="1" />
+      </div>
+      <!-- Cuotas -->
+      <div id="cnCuotasWrap" style="display:none">
+        <div class="form-group">
+          <label>Monto por cuota</label>
+          <input id="cnMontoCuota" type="number" placeholder="0" min="0" step="1" />
+        </div>
+        <div style="display:flex;gap:10px">
+          <div class="form-group" style="flex:1">
+            <label>Cuota actual</label>
+            <input id="cnCuotaActual" type="number" placeholder="1" min="1" step="1" />
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>Total cuotas</label>
+            <input id="cnCuotasTotal" type="number" placeholder="3" min="1" step="1" />
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">💡 Ej: compra en 3 cuotas y vas por la 2ª → cuota actual 2, total 3. La app sabe que falta 1 más.</div>
+      </div>
+      <button class="submit-btn" onclick="saveConsumo()">Guardar</button>
+      <button class="modal-delete-btn" id="cnDeleteBtn" onclick="deleteConsumo()" style="display:none">🗑 Eliminar</button>
     </div>
   </div>
 </div>
@@ -3816,6 +3884,12 @@ function renderAlertas() {
 }
 
 // ========== GASTOS PROGRAMADOS ==========
+function onGpCategoriaChange() {
+  const esTarjeta = document.getElementById('gpCategoria').value === 'tarjeta_credito';
+  document.getElementById('gpMontoWrap').style.display  = esTarjeta ? 'none' : 'block';
+  document.getElementById('gpTarjetaNota').style.display = esTarjeta ? 'block' : 'none';
+}
+
 function openGastoProgramadoModal(id = null) {
   state.editingGastoProgramadoId = id;
   const deleteBtn = document.getElementById('gpDeleteBtn');
@@ -3836,29 +3910,255 @@ function openGastoProgramadoModal(id = null) {
     document.getElementById('gpDiaPago').value   = '';
     deleteBtn.style.display = 'none';
   }
+  onGpCategoriaChange();
   document.getElementById('gastoProgramadoModal').classList.add('open');
 }
 
 function saveGastoProgramado() {
   const desc      = document.getElementById('gpDesc').value.trim();
-  const monto     = parseFloat(document.getElementById('gpMonto').value) || 0;
   const categoria = document.getElementById('gpCategoria').value;
+  const esTarjeta = categoria === 'tarjeta_credito';
+  // Para tarjeta el monto se calcula de los consumos; para el resto, del campo
+  let monto = esTarjeta ? 0 : (parseFloat(document.getElementById('gpMonto').value) || 0);
   let diaPago     = parseInt(document.getElementById('gpDiaPago').value) || null;
   if (diaPago && (diaPago < 1 || diaPago > 31)) diaPago = null;
   if (!desc)  { alert('Ingresá una descripción.'); return; }
-  if (!monto) { alert('Ingresá un monto.'); return; }
+  if (!esTarjeta && !monto) { alert('Ingresá un monto.'); return; }
 
   if (!state.gastosProgramados) state.gastosProgramados = [];
 
   if (state.editingGastoProgramadoId) {
     const idx = state.gastosProgramados.findIndex(g => g.id === state.editingGastoProgramadoId);
-    if (idx !== -1) state.gastosProgramados[idx] = { ...state.gastosProgramados[idx], desc, monto, categoria, diaPago };
+    if (idx !== -1) {
+      const prev = state.gastosProgramados[idx];
+      // Si es tarjeta, preservar consumos y recalcular monto
+      const nuevo = { ...prev, desc, categoria, diaPago };
+      if (esTarjeta) {
+        if (!nuevo.consumos) nuevo.consumos = [];
+        nuevo.monto = calcTotalTarjeta(nuevo);
+      } else {
+        nuevo.monto = monto;
+        delete nuevo.consumos;
+      }
+      state.gastosProgramados[idx] = nuevo;
+    }
   } else {
-    state.gastosProgramados.push({ id: uid(), desc, monto, categoria, diaPago });
+    const nuevo = { id: uid(), desc, monto, categoria, diaPago };
+    if (esTarjeta) nuevo.consumos = [];
+    state.gastosProgramados.push(nuevo);
   }
   saveState();
   closeModal('gastoProgramadoModal');
   renderGastosProgramados();
+}
+
+// Total de la tarjeta este mes = suma de consumos activos (únicos + cuotas vigentes)
+function calcTotalTarjeta(gp) {
+  if (!gp.consumos) return 0;
+  return gp.consumos.reduce((s, c) => {
+    if (c.cuotas && c.cuotas > 1) {
+      return s + (c.cuotaActual <= c.cuotas ? c.montoPorCuota : 0);
+    }
+    return s + (c.monto || 0);
+  }, 0);
+}
+
+// Total proyectado del PRÓXIMO mes (cuotas avanzan +1, las que terminan se caen)
+function calcTotalTarjetaProximo(gp) {
+  if (!gp.consumos) return 0;
+  return gp.consumos.reduce((s, c) => {
+    if (c.cuotas && c.cuotas > 1) {
+      const prox = c.cuotaActual + 1;
+      return s + (prox <= c.cuotas ? c.montoPorCuota : 0);
+    }
+    return s + (c.monto || 0); // los fijos siguen
+  }, 0);
+}
+
+// ===== CONSUMOS DE TARJETA =====
+let consumoTarjetaId = null;      // id del gasto programado (tarjeta) abierto
+let editingConsumoId = null;      // id del consumo en edición
+
+function abrirConsumos(gpId) {
+  consumoTarjetaId = gpId;
+  renderConsumos();
+  document.getElementById('consumosModal').classList.add('open');
+}
+
+function renderConsumos() {
+  const gp = state.gastosProgramados.find(g => g.id === consumoTarjetaId);
+  if (!gp) return;
+  if (!gp.consumos) gp.consumos = [];
+
+  document.getElementById('consumosTitle').textContent = `💳 ${gp.desc}`;
+
+  const totalMes  = calcTotalTarjeta(gp);
+  const totalProx = calcTotalTarjetaProximo(gp);
+
+  let html = `
+    <div style="background:linear-gradient(135deg,rgba(100,180,255,.1),rgba(53,241,160,.06));border:1px solid rgba(100,180,255,.25);border-radius:14px;padding:14px 16px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:11px;color:var(--muted)">Este mes</div>
+          <div style="font-size:22px;font-weight:700;color:#64b4ff">${fmt(totalMes)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--muted)">Próximo mes (estimado)</div>
+          <div style="font-size:16px;font-weight:600;color:var(--muted)">${fmt(totalProx)}</div>
+        </div>
+      </div>
+    </div>
+    <button class="submit-btn" onclick="openConsumoForm()" style="margin-bottom:14px">➕ Agregar consumo</button>`;
+
+  if (gp.consumos.length === 0) {
+    html += `<div class="empty" style="padding:12px 0"><div>Sin consumos cargados</div></div>`;
+  } else {
+    html += gp.consumos.map(c => {
+      const esCuota = c.cuotas && c.cuotas > 1;
+      const terminada = esCuota && c.cuotaActual > c.cuotas;
+      let sub, montoTxt, badge = '';
+      if (esCuota) {
+        montoTxt = fmt(c.montoPorCuota);
+        if (terminada) {
+          sub = `✅ Terminada (${c.cuotas} cuotas)`;
+          badge = `<span style="font-size:10px;background:rgba(53,241,160,.15);color:var(--accent2);padding:2px 7px;border-radius:6px;font-weight:600">saldada</span>`;
+        } else {
+          const faltan = c.cuotas - c.cuotaActual;
+          sub = `Cuota ${c.cuotaActual} de ${c.cuotas}`;
+          badge = `<span style="font-size:10px;background:rgba(247,208,56,.15);color:var(--yellow);padding:2px 7px;border-radius:6px;font-weight:600">faltan ${faltan}</span>`;
+        }
+      } else {
+        montoTxt = fmt(c.monto);
+        sub = '🔁 Mensual fijo';
+      }
+      return `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;opacity:${terminada ? 0.5 : 1};cursor:pointer" onclick="openConsumoForm('${c.id}')">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;color:var(--text)">${c.desc}</div>
+          <div style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-top:2px">${sub} ${badge}</div>
+        </div>
+        <div style="font-size:15px;font-weight:700;color:${terminada ? 'var(--muted)' : 'var(--red)'}">-${montoTxt}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Botón avanzar mes (simula el paso de mes: cuotas +1)
+  if (gp.consumos.some(c => c.cuotas && c.cuotas > 1 && c.cuotaActual <= c.cuotas)) {
+    html += `<button onclick="avanzarMesTarjeta()" style="width:100%;margin-top:6px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">⏭ Avanzar al próximo mes (cuotas +1)</button>`;
+  }
+
+  document.getElementById('consumosBody').innerHTML = html;
+}
+
+function openConsumoForm(id = null) {
+  editingConsumoId = id;
+  const del = document.getElementById('cnDeleteBtn');
+  if (id) {
+    const gp = state.gastosProgramados.find(g => g.id === consumoTarjetaId);
+    const c = gp.consumos.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('consumoFormTitle').textContent = '✏️ Editar Consumo';
+    document.getElementById('cnDesc').value = c.desc;
+    if (c.cuotas && c.cuotas > 1) {
+      setConsumoTipo('cuotas');
+      document.getElementById('cnMontoCuota').value  = c.montoPorCuota;
+      document.getElementById('cnCuotaActual').value = c.cuotaActual;
+      document.getElementById('cnCuotasTotal').value = c.cuotas;
+    } else {
+      setConsumoTipo('unico');
+      document.getElementById('cnMonto').value = c.monto;
+    }
+    del.style.display = 'block';
+  } else {
+    document.getElementById('consumoFormTitle').textContent = '➕ Nuevo Consumo';
+    document.getElementById('cnDesc').value = '';
+    document.getElementById('cnMonto').value = '';
+    document.getElementById('cnMontoCuota').value = '';
+    document.getElementById('cnCuotaActual').value = '';
+    document.getElementById('cnCuotasTotal').value = '';
+    setConsumoTipo('unico');
+    del.style.display = 'none';
+  }
+  document.getElementById('consumoFormModal').classList.add('open');
+}
+
+function setConsumoTipo(tipo) {
+  document.getElementById('cnTipo').value = tipo;
+  document.getElementById('cnMontoWrap').style.display  = tipo === 'unico'  ? 'block' : 'none';
+  document.getElementById('cnCuotasWrap').style.display = tipo === 'cuotas' ? 'block' : 'none';
+  document.querySelectorAll('.cn-tipo-btn').forEach(b => {
+    const activo = b.dataset.tipo === tipo;
+    b.style.borderColor = activo ? '#64b4ff' : 'var(--border)';
+    b.style.background   = activo ? 'rgba(100,180,255,.12)' : 'var(--surface2)';
+    b.style.color        = activo ? '#64b4ff' : 'var(--text)';
+  });
+}
+
+function saveConsumo() {
+  const gp = state.gastosProgramados.find(g => g.id === consumoTarjetaId);
+  if (!gp) return;
+  if (!gp.consumos) gp.consumos = [];
+
+  const desc = document.getElementById('cnDesc').value.trim();
+  const tipo = document.getElementById('cnTipo').value;
+  if (!desc) { showToast('Ingresá una descripción', 'error'); return; }
+
+  let consumo;
+  if (tipo === 'cuotas') {
+    const montoPorCuota = parseFloat(document.getElementById('cnMontoCuota').value) || 0;
+    const cuotaActual   = parseInt(document.getElementById('cnCuotaActual').value) || 1;
+    const cuotas        = parseInt(document.getElementById('cnCuotasTotal').value) || 1;
+    if (!montoPorCuota) { showToast('Ingresá el monto por cuota', 'error'); return; }
+    if (cuotaActual > cuotas) { showToast('La cuota actual no puede superar el total', 'error'); return; }
+    consumo = { desc, montoPorCuota, cuotaActual, cuotas };
+  } else {
+    const monto = parseFloat(document.getElementById('cnMonto').value) || 0;
+    if (!monto) { showToast('Ingresá el monto', 'error'); return; }
+    consumo = { desc, monto };
+  }
+
+  if (editingConsumoId) {
+    const idx = gp.consumos.findIndex(x => x.id === editingConsumoId);
+    if (idx !== -1) gp.consumos[idx] = { ...gp.consumos[idx], ...consumo };
+  } else {
+    gp.consumos.push({ id: uid(), ...consumo });
+  }
+
+  gp.monto = calcTotalTarjeta(gp); // recalcular total de la tarjeta
+  saveState();
+  closeModal('consumoFormModal');
+  renderConsumos();
+  renderGastosProgramados();
+}
+
+function deleteConsumo() {
+  if (!editingConsumoId) return;
+  const gp = state.gastosProgramados.find(g => g.id === consumoTarjetaId);
+  if (!gp) return;
+  gp.consumos = gp.consumos.filter(x => x.id !== editingConsumoId);
+  gp.monto = calcTotalTarjeta(gp);
+  saveState();
+  closeModal('consumoFormModal');
+  renderConsumos();
+  renderGastosProgramados();
+}
+
+function avanzarMesTarjeta() {
+  const gp = state.gastosProgramados.find(g => g.id === consumoTarjetaId);
+  if (!gp) return;
+  if (!confirm('¿Avanzar al próximo mes? Las cuotas suben +1 y las que terminaron se quitan.')) return;
+  gp.consumos = gp.consumos.filter(c => {
+    if (c.cuotas && c.cuotas > 1) {
+      c.cuotaActual++;
+      return c.cuotaActual <= c.cuotas; // quitar las que ya terminaron
+    }
+    return true; // los fijos quedan
+  });
+  gp.monto = calcTotalTarjeta(gp);
+  saveState();
+  renderConsumos();
+  renderGastosProgramados();
+  showToast('Avanzado al próximo mes');
 }
 
 function deleteGastoProgramado() {
@@ -4048,6 +4348,8 @@ function renderGastosProgramados() {
             <div style="font-size:11px;color:var(--muted)">${pagado ? '✓ pagado' : pct + '%'}</div>
           </div>
         </div>
+        ${g.categoria === 'tarjeta_credito' ? `
+        <button onclick="event.stopPropagation();abrirConsumos('${g.id}')" style="margin-top:8px;width:100%;background:rgba(100,180,255,.1);border:1px solid rgba(100,180,255,.25);color:#64b4ff;border-radius:8px;padding:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">💳 Ver consumos (${(g.consumos||[]).length})</button>` : ''}
         ${updateBtn}
       </div>`;
     }).join('');
