@@ -381,7 +381,7 @@
     --red:     #dc2626;
   }
   body.light .header { background: #ffffff; border-bottom: 1px solid var(--border); }
-  body.light .nav-bar { background: #ffffff; border-top: 1px solid var(--border); }
+  body.light .nav { background: #ffffff; border-top: 1px solid var(--border); }
   body.light .month-select-wrap { background: #ffffff; }
 
   /* ── CONTEXT MENU ── */
@@ -897,7 +897,7 @@
     <div id="patrimonioCard"></div>
     <div class="capital-strip" id="capitalStripIngresos"></div>
     <div class="section-title">
-      <span>Cuentas de Ingreso</span>
+      <span>Cuentas</span>
       <button class="add-btn" onclick="openCuentaModal('ingreso')">+ Cuenta</button>
     </div>
     <div id="listCuentasIngresos"></div>
@@ -963,7 +963,7 @@
       <polyline points="5,12 12,5 19,12"/>
       <line x1="5" y1="19" x2="19" y2="19"/>
     </svg>
-    Ingresos
+    Cuentas
   </button>
   <button class="nav-btn" id="nav-gastos" onclick="switchTab('gastos')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -1018,6 +1018,38 @@
   </div>
 </div>
 
+<!-- MODAL TARJETA -->
+<div class="modal-overlay" id="tarjetaModal" onclick="if(event.target===this)closeModal('tarjetaModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <span id="tarjetaTitle">💳 Tarjeta</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button onclick="editCuentaFromTarjeta()" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px" title="Editar">✏️</button>
+          <div class="modal-close" onclick="closeModal('tarjetaModal')">✕</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-body" id="tarjetaBody"></div>
+  </div>
+</div>
+
+<!-- MODAL PAGO RESUMEN -->
+<div class="modal-overlay" id="pagoResumenModal" onclick="if(event.target===this)closeModal('pagoResumenModal')">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <div class="modal-title"><span>💸 Pagar resumen</span><div class="modal-close" onclick="closeModal('pagoResumenModal')">✕</div></div>
+    </div>
+    <div class="modal-body">
+      <div id="pagoResumenTexto" style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5"></div>
+      <div class="form-group"><label>Monto</label><input id="prMonto" type="number" step="0.01" inputmode="decimal"></div>
+      <div class="form-group"><label>Pagado desde</label><select id="prOrigen"></select></div>
+      <div class="form-group"><label>Fecha</label><input id="prFecha" type="date"></div>
+      <button class="submit-btn" onclick="confirmarPagoResumen()">Registrar pago</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL TRANSACCIÓN -->
 <div class="modal-overlay" id="txModal">
   <div class="modal">
@@ -1038,7 +1070,7 @@
     </div>
     <div class="form-group">
       <label>Monto</label>
-      <input id="txMonto" type="number" inputmode="decimal" placeholder="0" min="0" step="0.01" />
+      <input id="txMonto" type="number" inputmode="decimal" placeholder="0" min="0" step="0.01" oninput="updateCuotasInfo()" />
       <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
         <button type="button" onclick="sumarMonto(1000)" style="flex:1;min-width:52px;padding:7px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">+1k</button>
         <button type="button" onclick="sumarMonto(5000)" style="flex:1;min-width:52px;padding:7px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">+5k</button>
@@ -1060,8 +1092,15 @@
         <select id="txCuenta" onchange="onCuentaChange()"></select>
       </div>
       <div class="form-group" id="grupOrigen" style="display:none">
-        <label>Pagado desde <span style="color:var(--muted);font-size:11px">(Billetera, Banco...)</span></label>
-        <select id="txOrigen"></select>
+        <label>Pagado desde <span style="color:var(--muted);font-size:11px">(Billetera, Banco, Tarjeta...)</span></label>
+        <select id="txOrigen" onchange="onOrigenChange()"></select>
+      </div>
+      <div class="form-group" id="grupCuotas" style="display:none">
+        <label>Cuotas <span style="color:var(--muted);font-size:11px">(1 = pago único)</span></label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input id="txCuotas" type="number" min="1" max="60" value="1" style="width:84px" oninput="updateCuotasInfo()">
+          <div id="cuotasInfo" style="font-size:12px;color:var(--muted)"></div>
+        </div>
       </div>
     </div>
 
@@ -1133,11 +1172,18 @@
     </div>
     <div class="form-group">
       <label id="cTipoLabel">Tipo</label>
-      <select id="cTipo"></select>
+      <select id="cTipo" onchange="onCTipoChange()"></select>
     </div>
     <div class="form-group">
       <label>Saldo Inicial</label>
       <input id="cSaldo" type="number" placeholder="0.00" step="0.01" />
+    </div>
+    <div id="cTarjetaWrap" style="display:none">
+      <div style="display:flex;gap:10px">
+        <div class="form-group" style="flex:1"><label>Día de cierre</label><input id="cDiaCierre" type="number" min="1" max="31" placeholder="28"></div>
+        <div class="form-group" style="flex:1"><label>Día de vencimiento</label><input id="cDiaPago" type="number" min="1" max="31" placeholder="10"></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin:-6px 0 12px;line-height:1.5">Las compras hasta el día de cierre entran en el resumen de ese mes y se pagan el día de vencimiento del mes siguiente. Si ya debés plata de resúmenes viejos, ponela como saldo inicial negativo.</div>
     </div>
     <button class="submit-btn" onclick="saveCuenta()">Guardar Cuenta</button>
     <button class="modal-delete-btn" id="cuentaDeleteBtn" onclick="deleteCuentaFromModal()" style="display:none">🗑 Eliminar cuenta</button>
@@ -1247,9 +1293,8 @@
       </div>
       <div class="form-group">
         <label>Categoría</label>
-        <select id="gpCategoria" onchange="onGpCategoriaChange()">
+        <select id="gpCategoria">
           <option value="gasto_otro">🗂 Otro</option>
-          <option value="tarjeta_credito">💳 Tarjeta de Crédito</option>
           <option value="gasto_alquiler">🏠 Alquiler / Vivienda</option>
           <option value="gasto_auto">🚗 Auto / Transporte</option>
           <option value="gasto_comida">🛒 Comida / Supermercado</option>
@@ -1262,14 +1307,7 @@
           <option value="gasto_viajes">✈️ Viajes / Vacaciones</option>
         </select>
       </div>
-      <div id="gpTarjetaNota" style="display:none;font-size:12px;color:#64b4ff;background:rgba(100,180,255,.08);border:1px solid rgba(100,180,255,.2);border-radius:10px;padding:10px 12px;margin-bottom:14px">
-        💳 El monto se calcula solo sumando los consumos. Guardá primero y después cargá cada consumo tocando la tarjeta.
-      </div>
-      <div class="form-group" id="gpDiaCierreWrap" style="display:none">
-        <label>Día de cierre del resumen <span style="color:var(--muted);font-size:11px">(1 al 31)</span></label>
-        <input id="gpDiaCierre" type="number" placeholder="Ej: 28" min="1" max="31" step="1" />
-        <div style="font-size:11px;color:var(--muted);margin-top:6px">💡 Lo que cargues después del cierre va al próximo resumen automáticamente.</div>
-      </div>
+      <div style="font-size:11px;color:#64b4ff;background:rgba(100,180,255,.08);border:1px solid rgba(100,180,255,.2);border-radius:10px;padding:10px 12px;margin-bottom:14px">💳 Las tarjetas de crédito ahora se manejan desde <b>Cuentas</b>: creá una cuenta de tipo "Tarjeta Crédito" y cargá los consumos como gastos pagados con ella.</div>
       <div class="form-group">
         <label>Día de pago del mes <span style="color:var(--muted);font-size:11px">(1 al 31)</span></label>
         <input id="gpDiaPago" type="number" placeholder="Ej: 10" min="1" max="31" step="1" />
@@ -1277,72 +1315,6 @@
       </div>
       <button class="submit-btn" onclick="saveGastoProgramado()">Guardar</button>
       <button class="modal-delete-btn" id="gpDeleteBtn" onclick="deleteGastoProgramado()" style="display:none">🗑 Eliminar</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL CONSUMOS DE TARJETA -->
-<div class="modal-overlay" id="consumosModal" onclick="if(event.target===this)closeModal('consumosModal')">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">
-        <span id="consumosTitle">💳 Consumos</span>
-        <div class="modal-close" onclick="closeModal('consumosModal')">✕</div>
-      </div>
-    </div>
-    <div class="modal-body" id="consumosBody"></div>
-  </div>
-</div>
-
-<!-- MODAL AGREGAR/EDITAR CONSUMO -->
-<div class="modal-overlay" id="consumoFormModal" onclick="if(event.target===this)closeModal('consumoFormModal')">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">
-        <span id="consumoFormTitle">➕ Nuevo Consumo</span>
-        <div class="modal-close" onclick="closeModal('consumoFormModal')">✕</div>
-      </div>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label>Descripción</label>
-        <input id="cnDesc" placeholder="Ej: Netflix, Zapatillas, Heladera..." />
-      </div>
-      <div class="form-group">
-        <label>Entra en</label>
-        <select id="cnDesde"></select>
-      </div>
-      <div class="form-group">
-        <label>Tipo</label>
-        <div style="display:flex;gap:8px">
-          <div class="cn-tipo-btn" data-tipo="unico" onclick="setConsumoTipo('unico')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);text-align:center;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);transition:all .2s">🔁 Mensual fijo</div>
-          <div class="cn-tipo-btn" data-tipo="cuotas" onclick="setConsumoTipo('cuotas')" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);text-align:center;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);transition:all .2s">💳 En cuotas</div>
-        </div>
-        <input type="hidden" id="cnTipo" value="unico" />
-      </div>
-      <div class="form-group" id="cnMontoWrap">
-        <label>Monto mensual</label>
-        <input id="cnMonto" type="number" placeholder="0" min="0" step="1" />
-      </div>
-      <div id="cnCuotasWrap" style="display:none">
-        <div class="form-group">
-          <label>Monto por cuota</label>
-          <input id="cnMontoCuota" type="number" placeholder="0" min="0" step="1" />
-        </div>
-        <div style="display:flex;gap:10px">
-          <div class="form-group" style="flex:1">
-            <label>Cuota actual</label>
-            <input id="cnCuotaActual" type="number" placeholder="1" min="1" step="1" />
-          </div>
-          <div class="form-group" style="flex:1">
-            <label>Total cuotas</label>
-            <input id="cnCuotasTotal" type="number" placeholder="3" min="1" step="1" />
-          </div>
-        </div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">💡 "Cuota actual" es la que toca en el resumen que elegiste arriba. La app avanza sola mes a mes.</div>
-      </div>
-      <button class="submit-btn" onclick="saveConsumo()">Guardar</button>
-      <button class="modal-delete-btn" id="cnDeleteBtn" onclick="deleteConsumo()" style="display:none">🗑 Eliminar</button>
     </div>
   </div>
 </div>
@@ -1541,7 +1513,6 @@
   <div class="viewer-body" id="viewerBody"></div>
   <button class="viewer-dl" id="viewerDl" onclick="downloadAttachment()">⬇ Descargar</button>
 </div>
-
 <script>
 // ========== STATE ==========
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -1615,9 +1586,9 @@ function fmt(n) {
 function fmtSigned(n) { return (n >= 0 ? '+' : '-') + fmt(n); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function mesKey(y, m) { return `${y}-${String(m + 1).padStart(2, '0')}`; }
-function mesesEntre(desde, y, m) {            // meses desde 'YYYY-MM' hasta (y, m)
-  const [dy, dm] = desde.split('-').map(Number);
-  return (y - dy) * 12 + (m + 1 - dm);
+function hoyISO() {
+  const h = new Date();
+  return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
 }
 
 // ========== FILE ATTACHMENT ==========
@@ -1797,6 +1768,7 @@ function importData(e) {
       const nTx      = data.transactions.length;
       if (!confirm(`¿Importar ${nCuentas} cuentas y ${nTx} movimientos?\n\nEsto REEMPLAZA todos los datos actuales.`)) return;
       CAMPOS_BACKUP.forEach(k => { if (data[k] !== undefined) state[k] = data[k]; });
+      migrarTarjetasViejas();
       saveState();
       render();
       document.getElementById('settingsUrl').value = state.driveScriptUrl || '';
@@ -1919,6 +1891,16 @@ function renderInsights() {
     }
   }
 
+  // Tarjetas: resúmenes cerrados sin pagar
+  state.cuentas.filter(c => c.tipo === 'tarjeta_credito' && c.diaCierre).forEach(c => {
+    resumenesTarjeta(c).filter(r => r.estado === 'cerrado' || r.estado === 'vencido').forEach(r => {
+      const dias = Math.ceil((r.vence - new Date()) / 86400000);
+      insights.push({ icon: '💳', color: dias < 0 ? 'var(--red)' : dias <= 5 ? 'var(--yellow)' : '#64b4ff',
+        text: dias < 0 ? `<b>${c.nombre}</b>: resumen de ${MONTHS[r.m]} vencido hace ${-dias} día${-dias !== 1 ? 's' : ''} (${fmt(r.saldo)})`
+                       : `<b>${c.nombre}</b>: ${fmt(r.saldo)} vence en ${dias} día${dias !== 1 ? 's' : ''}` });
+    });
+  });
+
   const mk = `${state.currentYear}-${state.currentMonth}`;
   const sinPagar = (state.gastosProgramados || []).filter(g => !g.pagadoMeses?.[mk]);
   if (sinPagar.length > 0 && state.currentMonth === new Date().getMonth() && state.currentYear === new Date().getFullYear()) {
@@ -1943,7 +1925,7 @@ function renderInsights() {
   }
 
   if (insights.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML = insights.slice(0, 2).map(ins => `
+  el.innerHTML = insights.slice(0, 3).map(ins => `
     <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--surface);border:1px solid var(--border);border-left:3px solid ${ins.color};border-radius:12px;margin-bottom:8px">
       <span style="font-size:18px">${ins.icon}</span>
       <span style="font-size:13px;color:var(--text);line-height:1.4">${ins.text}</span>
@@ -2507,7 +2489,7 @@ function renderCuentasIngresos() {
   strip.innerHTML = '';
   const el = document.getElementById('listCuentasIngresos');
   if (ingCuentas.length === 0) {
-    el.innerHTML = `<div class="empty"><div>No hay cuentas de ingreso. ¡Agregá la primera!</div></div>`;
+    el.innerHTML = `<div class="empty"><div>No hay cuentas. ¡Agregá la primera!</div></div>`;
     return;
   }
 
@@ -2523,7 +2505,7 @@ function renderCuentasIngresos() {
     const saldo = calcSaldo(c);
     const info  = TIPO_INFO[c.tipo] || { icon:'📦', label:'Otro' };
     const esFX  = ['dolar','guarani','real'].includes(c.tipo);
-    let saldoTxt = '', saldoClass = '';
+    let saldoTxt = '', saldoClass = '', tipoTxt = info.label;
     if (esFX) {
       const nomFX = calcNominalUSD(c);
       const sym   = c.tipo === 'dolar' ? 'USD' : c.tipo === 'guarani' ? '₲' : 'R$';
@@ -2532,6 +2514,13 @@ function renderCuentasIngresos() {
       saldoTxt  = `${sym} ${nomFX.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2})}`;
       saldoClass = 'pos';
       if (arsVal !== null) saldoTxt += `<div style="font-size:11px;color:var(--muted);font-weight:400">≈ ${fmt(arsVal)}</div>`;
+    } else if (c.tipo === 'tarjeta_credito') {
+      saldoTxt   = saldo < 0 ? '-' + fmt(saldo) : fmt(saldo);
+      saldoClass = saldo < 0 ? 'neg' : 'pos';
+      if (c.diaCierre) {
+        const prox = resumenesTarjeta(c).find(r => r.estado === 'cerrado' || r.estado === 'vencido');
+        tipoTxt = prox ? `${fmt(prox.saldo)} vence ${fmtDM(prox.vence)}` : `cierra el ${c.diaCierre}`;
+      } else tipoTxt = 'Configurá cierre y vencimiento';
     } else {
       saldoTxt   = fmt(saldo);
       saldoClass = saldo >= 0 ? 'pos' : 'neg';
@@ -2540,7 +2529,7 @@ function renderCuentasIngresos() {
       <div class="cuenta-simple-icon" style="background:${info.bg || 'var(--surface2)'};border-color:${info.color || 'var(--border)'};">${info.icon}</div>
       <div class="cuenta-simple-info">
         <div class="cuenta-simple-nombre">${c.nombre}</div>
-        <div class="cuenta-simple-tipo" style="color:${info.color || 'var(--muted)'}">● ${info.label}</div>
+        <div class="cuenta-simple-tipo" style="color:${info.color || 'var(--muted)'}">● ${tipoTxt}</div>
       </div>
       <div class="cuenta-simple-saldo ${saldoClass}">${saldoTxt}</div>
     </div>`;
@@ -2675,11 +2664,6 @@ function buildCuentaRow(c) {
 }
 
 // ========== MODALS ==========
-function hoyISO() {
-  const h = new Date();
-  return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
-}
-
 function openModal(type) {
   state.editingTxId = null;
   state.txType = type || 'income';
@@ -2700,6 +2684,8 @@ function openModal(type) {
     const selOrigen = document.getElementById('txOrigen');
     if (selOrigen && [...selOrigen.options].some(o => o.value === state.lastOrigenId)) selOrigen.value = state.lastOrigenId;
   }
+  document.getElementById('txCuotas').value = 1;
+  onOrigenChange();
   document.getElementById('txModal').classList.add('open');
   setTimeout(() => document.getElementById('txMonto').focus(), 350);
 }
@@ -2750,6 +2736,7 @@ function editTx(id) {
     document.getElementById('grupOrigen').style.display = 'block';
     document.getElementById('txOrigen').value = t.origenId || '';
   }
+  onOrigenChange();
   document.getElementById('txModal').classList.add('open');
 }
 
@@ -2760,19 +2747,38 @@ function duplicarTx() {
   document.getElementById('txDeleteBtn').style.display = 'none';
   document.getElementById('txDupBtn').style.display = 'none';
   removeAttach();
+  onOrigenChange();
   document.getElementById('txMonto').focus();
 }
 
-// ========== HELPERS DE MONTO ==========
+// ========== HELPERS DE MONTO / CUOTAS ==========
 function sumarMonto(n) {
   const inp = document.getElementById('txMonto');
   inp.value = (parseFloat(inp.value) || 0) + n;
+  updateCuotasInfo();
 }
 function redondearMonto() {
   const inp = document.getElementById('txMonto');
   inp.value = Math.round(parseFloat(inp.value) || 0);
+  updateCuotasInfo();
 }
-function limpiarMonto() { document.getElementById('txMonto').value = ''; }
+function limpiarMonto() { document.getElementById('txMonto').value = ''; updateCuotasInfo(); }
+
+function esTarjeta(id) { const c = state.cuentas.find(x => x.id === id); return !!c && c.tipo === 'tarjeta_credito'; }
+
+function onOrigenChange() {
+  const show = state.txType === 'expense' && !state.editingTxId && esTarjeta(document.getElementById('txOrigen').value);
+  document.getElementById('grupCuotas').style.display = show ? 'block' : 'none';
+  if (!show) document.getElementById('txCuotas').value = 1;
+  updateCuotasInfo();
+}
+
+function updateCuotasInfo() {
+  const n = parseInt(document.getElementById('txCuotas').value) || 1;
+  const total = parseFloat(document.getElementById('txMonto').value) || 0;
+  document.getElementById('cuotasInfo').textContent =
+    n > 1 && total ? `${n} × ${fmt(Math.round(total / n))} · ingresá el total de la compra` : '';
+}
 
 function openFabMenu() { document.getElementById('fabMenu').classList.add('open'); }
 
@@ -2781,6 +2787,7 @@ let detailCuentaId = null;
 function openCuentaDetail(id) {
   const c = state.cuentas.find(x => x.id === id);
   if (!c) return;
+  if (c.tipo === 'tarjeta_credito') return openTarjetaDetail(id);
   detailCuentaId = id;
   const info  = TIPO_INFO[c.tipo] || { icon:'📦', label:'Otro' };
   const saldo = calcSaldo(c);
@@ -2859,11 +2866,18 @@ function deleteCuenta(id) {
   if (borrarCuenta(id)) render();
 }
 
+function onCTipoChange() {
+  document.getElementById('cTarjetaWrap').style.display =
+    document.getElementById('cTipo').value === 'tarjeta_credito' ? 'block' : 'none';
+}
+
 function openCuentaModal(mode) {
   state.editingCuentaId = null;
   state.cuentaModalMode = mode || 'ingreso';
   document.getElementById('cNombre').value = '';
   document.getElementById('cSaldo').value = '';
+  document.getElementById('cDiaCierre').value = '';
+  document.getElementById('cDiaPago').value = '';
   filterCuentaTipoOptions(state.cuentaModalMode);
   if (mode === 'gasto') {
     document.getElementById('modalCuentaTitle').textContent = '➕ Nueva Cuenta de Gasto';
@@ -2871,11 +2885,12 @@ function openCuentaModal(mode) {
     document.getElementById('cNombre').placeholder = 'Ej: Tenis, McDonald\'s, Spotify...';
     document.getElementById('cTipoLabel').textContent = 'Categoría';
   } else {
-    document.getElementById('modalCuentaTitle').textContent = '➕ Nueva Cuenta de Ingreso';
+    document.getElementById('modalCuentaTitle').textContent = '➕ Nueva Cuenta';
     document.getElementById('cNombreLabel').textContent = 'Nombre';
-    document.getElementById('cNombre').placeholder = 'Ej: Banco Galicia, Billetera...';
+    document.getElementById('cNombre').placeholder = 'Ej: Banco Galicia, Visa, Billetera...';
     document.getElementById('cTipoLabel').textContent = 'Tipo';
   }
+  onCTipoChange();
   document.getElementById('cuentaDeleteBtn').style.display = 'none';
   document.getElementById('cuentaModal').classList.add('open');
   setTimeout(() => document.getElementById('cNombre').focus(), 350);
@@ -2894,25 +2909,22 @@ function editCuenta(id) {
   const mode = c.tipo.startsWith('gasto_') ? 'gasto' : 'ingreso';
   state.cuentaModalMode = mode;
   filterCuentaTipoOptions(mode);
-  if (mode === 'gasto') {
-    document.getElementById('modalCuentaTitle').textContent = '✏️ Editar Cuenta de Gasto';
-    document.getElementById('cNombreLabel').textContent = 'Nombre del gasto';
-    document.getElementById('cTipoLabel').textContent = 'Categoría';
-  } else {
-    document.getElementById('modalCuentaTitle').textContent = '✏️ Editar Cuenta';
-    document.getElementById('cNombreLabel').textContent = 'Nombre';
-    document.getElementById('cTipoLabel').textContent = 'Tipo';
-  }
+  document.getElementById('modalCuentaTitle').textContent = mode === 'gasto' ? '✏️ Editar Cuenta de Gasto' : '✏️ Editar Cuenta';
+  document.getElementById('cNombreLabel').textContent = mode === 'gasto' ? 'Nombre del gasto' : 'Nombre';
+  document.getElementById('cTipoLabel').textContent = mode === 'gasto' ? 'Categoría' : 'Tipo';
   document.getElementById('cNombre').value = c.nombre;
   document.getElementById('cTipo').value = c.tipo;
   document.getElementById('cSaldo').value = c.saldoInicial;
+  document.getElementById('cDiaCierre').value = c.diaCierre || '';
+  document.getElementById('cDiaPago').value = c.diaPago || '';
+  onCTipoChange();
   document.getElementById('cuentaDeleteBtn').style.display = 'block';
   document.getElementById('cuentaModal').classList.add('open');
 }
 
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-function setTxType(t) { state.txType = t; updateTxTypeUI(); }
+function setTxType(t) { state.txType = t; updateTxTypeUI(); onOrigenChange(); }
 
 function updateTxTypeUI() {
   const bi = document.getElementById('btnIncome');
@@ -3035,6 +3047,7 @@ function saveTx() {
 
     if (state.editingTxId) {
       const t = state.transactions.find(x => x.id === state.editingTxId);
+      if (t?.resumenKey) txBase.resumenKey = t.resumenKey;
       const transferId = t?.transferId || state.editingTxId;
       state.transactions = state.transactions.filter(x => x.transferId !== transferId && x.id !== state.editingTxId);
     }
@@ -3070,10 +3083,18 @@ function saveTx() {
       };
     }
   } else {
-    state.transactions.push({
-      id: uid(), type: state.txType, concepto, monto, cuentaId, categoria,
-      origenId, montoUSD, attachment: pendingFile || null, date: txDate
-    });
+    const nCuotas = (origenId && esTarjeta(origenId)) ? Math.max(1, parseInt(document.getElementById('txCuotas').value) || 1) : 1;
+    if (nCuotas === 1) {
+      state.transactions.push({ id: uid(), type: state.txType, concepto, monto, cuentaId, categoria, origenId, montoUSD, attachment: pendingFile || null, date: txDate });
+    } else {
+      const grupo = uid(), porCuota = Math.round((monto / nCuotas) * 100) / 100, base = new Date(txDate);
+      for (let i = 0; i < nCuotas; i++) {
+        const ultimo = new Date(base.getFullYear(), base.getMonth() + i + 1, 0).getDate();
+        const d = new Date(base.getFullYear(), base.getMonth() + i, Math.min(base.getDate(), ultimo), 12);
+        state.transactions.push({ id: uid(), type: 'expense', concepto: `${concepto} (${i + 1}/${nCuotas})`, monto: porCuota, cuentaId, categoria, origenId,
+          montoUSD: null, attachment: i === 0 ? (pendingFile || null) : null, date: d.toISOString(), cuotaGrupo: grupo, cuotaN: i + 1, cuotasTotal: nCuotas });
+      }
+    }
   }
 
   const savedType = state.txType;
@@ -3100,13 +3121,18 @@ function saveCuenta() {
   const tipo   = document.getElementById('cTipo').value;
   const saldo  = parseFloat(document.getElementById('cSaldo').value) || 0;
   if (!nombre) { showToast('Ingresá un nombre', 'error'); return; }
-
+  const extra = {};
+  if (tipo === 'tarjeta_credito') {
+    const dc = parseInt(document.getElementById('cDiaCierre').value), dp = parseInt(document.getElementById('cDiaPago').value);
+    if (!(dc >= 1 && dc <= 31) || !(dp >= 1 && dp <= 31)) { showToast('Completá día de cierre y vencimiento (1 a 31)', 'error'); return; }
+    extra.diaCierre = dc; extra.diaPago = dp;
+  }
   const wasEditingC = !!state.editingCuentaId;
   if (wasEditingC) {
     const idx = state.cuentas.findIndex(c => c.id === state.editingCuentaId);
-    if (idx !== -1) state.cuentas[idx] = { ...state.cuentas[idx], nombre, tipo, saldoInicial: saldo };
+    if (idx !== -1) state.cuentas[idx] = { ...state.cuentas[idx], nombre, tipo, saldoInicial: saldo, ...extra };
   } else {
-    state.cuentas.push({ id: uid(), nombre, tipo, saldoInicial: saldo });
+    state.cuentas.push({ id: uid(), nombre, tipo, saldoInicial: saldo, ...extra });
   }
   saveState();
   closeModal('cuentaModal');
@@ -3139,7 +3165,6 @@ function switchTab(tab) {
 
 // ========== RENDER ALL ==========
 function render() {
-  syncTarjetas();
   renderMonthChips();
   renderYearBars();
   renderInsights();
@@ -3154,9 +3179,7 @@ function render() {
   const ti = document.getElementById('themeItem');
   if (ti) ti.textContent = document.body.classList.contains('light') ? '🌙 Tema oscuro' : '☀️ Tema claro';
   setTimeout(setupSwipe, 50);
-}
-
-// ========== COTIZACIONES ==========
+}// ========== COTIZACIONES ==========
 let cotizaciones = { usd: null, pyg: null, brl: null };
 
 async function fetchCotizaciones() {
@@ -3248,14 +3271,192 @@ function calcNominalUSD(cuenta) {
   }, cuenta.saldoInicialUSD || 0);
 }
 
-// ========== GASTOS PROGRAMADOS ==========
-function onGpCategoriaChange() {
-  const esTarjeta = document.getElementById('gpCategoria').value === 'tarjeta_credito';
-  document.getElementById('gpMontoWrap').style.display     = esTarjeta ? 'none' : 'block';
-  document.getElementById('gpTarjetaNota').style.display   = esTarjeta ? 'block' : 'none';
-  document.getElementById('gpDiaCierreWrap').style.display = esTarjeta ? 'block' : 'none';
+// ========== TARJETAS DE CRÉDITO: RESÚMENES ==========
+function resumenDeFecha(fecha, diaCierre, diaPago) {
+  const d = new Date(fecha);
+  let y = d.getFullYear(), m = d.getMonth();
+  const ult = (yy, mm) => new Date(yy, mm + 1, 0).getDate();
+  if (d.getDate() > Math.min(diaCierre, ult(y, m))) { m++; if (m > 11) { m = 0; y++; } }
+  const cierre = new Date(y, m, Math.min(diaCierre, ult(y, m)), 23, 59, 59);
+  let vy = y, vm = m + 1; if (vm > 11) { vm = 0; vy++; }
+  const vence = new Date(vy, vm, Math.min(diaPago, ult(vy, vm)), 23, 59, 59);
+  return { key: mesKey(y, m), y, m, cierre, vence };
 }
 
+function resumenesTarjeta(cuenta) {
+  const dc = cuenta.diaCierre || 28, dp = cuenta.diaPago || 10;
+  const map = {};
+  const nuevo = r => ({ ...r, consumos: [], pagos: [], total: 0, pagado: 0 });
+  state.transactions.forEach(t => {
+    if (t.type === 'expense' && t.origenId === cuenta.id) {
+      const r = resumenDeFecha(t.date, dc, dp);
+      if (!map[r.key]) map[r.key] = nuevo(r);
+      map[r.key].consumos.push(t); map[r.key].total += t.monto;
+    }
+  });
+  state.transactions.forEach(t => {
+    if (t.type === 'transfer' && t.transferRole === 'in' && t.cuentaId === cuenta.id && t.resumenKey) {
+      if (!map[t.resumenKey]) { const [y, m] = t.resumenKey.split('-').map(Number); map[t.resumenKey] = nuevo(resumenDeFecha(new Date(y, m - 1, 1), dc, dp)); }
+      map[t.resumenKey].pagos.push(t); map[t.resumenKey].pagado += t.monto;
+    }
+  });
+  const hoyR = resumenDeFecha(new Date(), dc, dp);
+  if (!map[hoyR.key]) map[hoyR.key] = nuevo(hoyR);
+  const hoy = new Date();
+  return Object.values(map).map(r => {
+    const saldo = r.total - r.pagado;
+    const estado = hoy <= r.cierre ? 'abierto' : saldo <= 0.005 ? 'pagado' : hoy > r.vence ? 'vencido' : 'cerrado';
+    return { ...r, saldo, estado };
+  }).sort((a, b) => b.key.localeCompare(a.key));
+}
+
+let tarjetaDetailId = null, pagoResumenKey = null;
+const EST_RES = { abierto: ['#64b4ff', 'Abierto'], cerrado: ['#f7d038', 'A pagar'], vencido: ['#ff5e5e', 'Vencido'], pagado: ['#35f1a0', 'Pagado'] };
+const fmtDM = d => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+function openTarjetaDetail(id) {
+  const c = state.cuentas.find(x => x.id === id);
+  if (!c) return;
+  tarjetaDetailId = id;
+  if (!c.diaCierre || !c.diaPago) { showToast('Configurá el día de cierre y vencimiento', 'info'); editCuenta(id); return; }
+  document.getElementById('tarjetaTitle').textContent = `💳 ${c.nombre}`;
+  const res = resumenesTarjeta(c);
+  const deuda = -calcSaldo(c);
+  const prox = [...res].reverse().find(r => r.estado === 'cerrado' || r.estado === 'vencido');
+
+  let html = `<div style="background:var(--surface2);border-radius:14px;padding:14px 16px;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px">
+      <div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Deuda total</div>
+        <div style="font-size:26px;font-weight:700;color:${deuda > 0 ? 'var(--red)' : 'var(--accent2)'}">${fmt(deuda)}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Próximo vencimiento</div>
+        <div style="font-size:14px;font-weight:600;color:${prox ? EST_RES[prox.estado][0] : 'var(--muted)'}">${prox ? `${fmt(prox.saldo)} · ${fmtDM(prox.vence)}` : 'Nada pendiente'}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">Cierra el ${c.diaCierre} · vence el ${c.diaPago}</div>
+  </div>
+  <button class="submit-btn" style="margin:0 0 14px" onclick="cargarConsumoTarjeta('${c.id}')">➕ Cargar consumo</button>`;
+
+  html += res.map(r => {
+    const [col, lbl] = EST_RES[r.estado];
+    const fechas = r.estado === 'abierto'
+      ? `cierra el ${fmtDM(r.cierre)} · vence el ${fmtDM(r.vence)}`
+      : `cerró el ${fmtDM(r.cierre)} · ${r.estado === 'pagado' ? 'pagado' : 'vence el ' + fmtDM(r.vence)}`;
+    const filas = [...r.consumos].sort((a, b) => new Date(b.date) - new Date(a.date)).map(t => `
+      <div class="day-tx" style="padding:8px 0" onclick="closeModal('tarjetaModal');editTx('${t.id}')">
+        <div class="day-tx-info"><div class="day-tx-concept">${t.concepto}</div>
+          <div class="day-tx-sub">${fmtDM(new Date(t.date))}${t.cuotasTotal ? ' · cuota ' + t.cuotaN + '/' + t.cuotasTotal : ''}</div></div>
+        <div class="day-tx-amount neg">-${fmt(t.monto)}</div>
+      </div>`).join('')
+      + r.pagos.map(t => `
+      <div class="day-tx" style="padding:8px 0" onclick="closeModal('tarjetaModal');editTx('${t.id}')">
+        <div class="day-tx-info"><div class="day-tx-concept">${t.concepto}</div><div class="day-tx-sub">${fmtDM(new Date(t.date))}</div></div>
+        <div class="day-tx-amount pos">+${fmt(t.monto)}</div>
+      </div>`).join('');
+    const expandido = r.estado === 'cerrado' || r.estado === 'vencido';
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid ${col};border-radius:14px;margin-bottom:8px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer" onclick="toggleResumen('${r.key}')">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600">Resumen ${MONTHS[r.m]} ${r.y}
+            <span style="font-size:10px;color:${col};background:${col}22;padding:2px 7px;border-radius:6px;margin-left:4px;font-weight:700">${lbl}</span></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${fechas} · ${r.consumos.length} consumo${r.consumos.length !== 1 ? 's' : ''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:15px;font-weight:700;color:${col}">${fmt(r.estado === 'pagado' ? r.total : r.saldo)}</div>
+          ${r.pagado && r.estado !== 'pagado' ? `<div style="font-size:10px;color:var(--muted)">de ${fmt(r.total)}</div>` : ''}
+        </div>
+      </div>
+      <div id="res_${r.key}" style="display:${expandido ? 'block' : 'none'};padding:0 14px 12px">
+        ${filas || '<div style="font-size:12px;color:var(--muted);padding:6px 0">Sin consumos</div>'}
+        ${expandido ? `<button class="submit-btn" style="margin-top:10px;padding:10px" onclick="abrirPagoResumen('${r.key}')">💸 Pagar ${fmt(r.saldo)}</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('tarjetaBody').innerHTML = html;
+  document.getElementById('tarjetaModal').classList.add('open');
+}
+
+function toggleResumen(key) { const el = document.getElementById('res_' + key); if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'; }
+function editCuentaFromTarjeta() { closeModal('tarjetaModal'); editCuenta(tarjetaDetailId); }
+function cargarConsumoTarjeta(id) {
+  closeModal('tarjetaModal');
+  openModal('expense');
+  document.getElementById('txOrigen').value = id;
+  onOrigenChange();
+}
+
+function abrirPagoResumen(key) {
+  const c = state.cuentas.find(x => x.id === tarjetaDetailId);
+  const r = c && resumenesTarjeta(c).find(x => x.key === key);
+  if (!r) return;
+  pagoResumenKey = key;
+  document.getElementById('pagoResumenTexto').innerHTML =
+    `Resumen de <b>${MONTHS[r.m]}</b> · ${c.nombre}: total ${fmt(r.total)}${r.pagado ? `, ya pagaste ${fmt(r.pagado)}` : ''}. Si pagás menos (pago mínimo), el resto queda como deuda.`;
+  document.getElementById('prMonto').value = Math.round(r.saldo * 100) / 100;
+  const sel = document.getElementById('prOrigen');
+  sel.innerHTML = state.cuentas.filter(x => !x.tipo.startsWith('gasto_') && x.tipo !== 'tarjeta_credito')
+    .map(x => `<option value="${x.id}">${TIPO_INFO[x.tipo]?.icon || ''} ${x.nombre}</option>`).join('');
+  if (state.lastOrigenId && [...sel.options].some(o => o.value === state.lastOrigenId)) sel.value = state.lastOrigenId;
+  document.getElementById('prFecha').value = hoyISO();
+  closeModal('tarjetaModal');
+  document.getElementById('pagoResumenModal').classList.add('open');
+}
+
+function confirmarPagoResumen() {
+  const c = state.cuentas.find(x => x.id === tarjetaDetailId);
+  if (!c) return;
+  const monto = parseFloat(document.getElementById('prMonto').value);
+  const origenId = document.getElementById('prOrigen').value;
+  const f = document.getElementById('prFecha').value || hoyISO();
+  if (!monto || monto <= 0) { showToast('Ingresá un monto válido', 'error'); return; }
+  if (!origenId) { showToast('Elegí desde dónde pagás', 'error'); return; }
+  const [y, m, d] = f.split('-').map(Number);
+  const [, rm] = pagoResumenKey.split('-').map(Number);
+  const base = { concepto: `Pago resumen ${MONTHS[rm - 1]} · ${c.nombre}`, monto, date: new Date(y, m - 1, d, 12).toISOString(), type: 'transfer', attachment: null, resumenKey: pagoResumenKey };
+  const transferId = uid();
+  state.transactions.push({ id: uid(), ...base, transferId, cuentaId: origenId, transferRole: 'out' });
+  state.transactions.push({ id: uid(), ...base, transferId, cuentaId: c.id, transferRole: 'in' });
+  state.lastOrigenId = origenId;
+  saveState(); closeModal('pagoResumenModal'); render();
+  showToast('Pago registrado');
+  openTarjetaDetail(c.id);
+}
+
+// Migración: tarjetas que estaban en Programados → cuenta + consumos reales
+function migrarTarjetasViejas() {
+  const viejas = (state.gastosProgramados || []).filter(g => g.categoria === 'tarjeta_credito');
+  if (!viejas.length) return;
+  viejas.forEach(g => {
+    let cuenta = state.cuentas.find(c => c.tipo === 'tarjeta_credito' && normalizeStr(c.nombre) === normalizeStr(g.desc))
+              || state.cuentas.find(c => c.tipo === 'tarjeta_credito');
+    if (!cuenta) { cuenta = { id: uid(), nombre: g.desc, tipo: 'tarjeta_credito', saldoInicial: 0 }; state.cuentas.push(cuenta); }
+    cuenta.diaCierre = cuenta.diaCierre || g.diaCierre || 28;
+    cuenta.diaPago   = cuenta.diaPago   || g.diaPago   || 10;
+    let cg = state.cuentas.find(c => c.tipo === 'gasto_otro');
+    if (!cg) { cg = { id: uid(), nombre: 'Consumos tarjeta', tipo: 'gasto_otro', saldoInicial: 0 }; state.cuentas.push(cg); }
+    const h = new Date();
+    (g.consumos || []).forEach(c => {
+      const [dy, dm] = (c.desde || mesKey(h.getFullYear(), h.getMonth())).split('-').map(Number);
+      const fechaDe = i => new Date(dy, dm - 1 + i, Math.min(cuenta.diaCierre, new Date(dy, dm + i, 0).getDate()), 12).toISOString();
+      const base = { type: 'expense', cuentaId: cg.id, categoria: 'gasto_otro', origenId: cuenta.id, montoUSD: null, attachment: null };
+      if (c.cuotas > 1) {
+        const grupo = uid();
+        for (let n = c.cuotaActual || 1, i = 0; n <= c.cuotas; n++, i++)
+          state.transactions.push({ id: uid(), ...base, concepto: `${c.desc} (${n}/${c.cuotas})`, monto: c.montoPorCuota, date: fechaDe(i), cuotaGrupo: grupo, cuotaN: n, cuotasTotal: c.cuotas });
+      } else {
+        state.transactions.push({ id: uid(), ...base, concepto: c.desc, monto: c.monto || 0, date: fechaDe(0) });
+      }
+    });
+  });
+  state.gastosProgramados = state.gastosProgramados.filter(g => g.categoria !== 'tarjeta_credito');
+  saveState();
+  setTimeout(() => showToast('Tarjeta migrada a Cuentas. Revisá los consumos.', 'info'), 600);
+}
+
+// ========== GASTOS PROGRAMADOS ==========
 function openGastoProgramadoModal(id = null) {
   state.editingGastoProgramadoId = id;
   const deleteBtn = document.getElementById('gpDeleteBtn');
@@ -3267,7 +3468,6 @@ function openGastoProgramadoModal(id = null) {
     document.getElementById('gpMonto').value     = gp.monto;
     document.getElementById('gpCategoria').value = gp.categoria || 'gasto_otro';
     document.getElementById('gpDiaPago').value   = gp.diaPago || '';
-    document.getElementById('gpDiaCierre').value = gp.diaCierre || '';
     deleteBtn.style.display = 'block';
   } else {
     document.getElementById('gastoProgramadoTitle').textContent = '📅 Nuevo Gasto Programado';
@@ -3275,274 +3475,31 @@ function openGastoProgramadoModal(id = null) {
     document.getElementById('gpMonto').value     = '';
     document.getElementById('gpCategoria').value = 'gasto_otro';
     document.getElementById('gpDiaPago').value   = '';
-    document.getElementById('gpDiaCierre').value = '';
     deleteBtn.style.display = 'none';
   }
-  onGpCategoriaChange();
   document.getElementById('gastoProgramadoModal').classList.add('open');
 }
 
 function saveGastoProgramado() {
   const desc      = document.getElementById('gpDesc').value.trim();
   const categoria = document.getElementById('gpCategoria').value;
-  const esTarjeta = categoria === 'tarjeta_credito';
-  let monto = esTarjeta ? 0 : (parseFloat(document.getElementById('gpMonto').value) || 0);
+  const monto     = parseFloat(document.getElementById('gpMonto').value) || 0;
   let diaPago = parseInt(document.getElementById('gpDiaPago').value) || null;
   if (diaPago && (diaPago < 1 || diaPago > 31)) diaPago = null;
-  let diaCierre = parseInt(document.getElementById('gpDiaCierre').value) || null;
-  if (diaCierre && (diaCierre < 1 || diaCierre > 31)) diaCierre = null;
   if (!desc)  { showToast('Ingresá una descripción', 'error'); return; }
-  if (!esTarjeta && !monto) { showToast('Ingresá un monto', 'error'); return; }
+  if (!monto) { showToast('Ingresá un monto', 'error'); return; }
 
   if (!state.gastosProgramados) state.gastosProgramados = [];
 
   if (state.editingGastoProgramadoId) {
     const idx = state.gastosProgramados.findIndex(g => g.id === state.editingGastoProgramadoId);
-    if (idx !== -1) {
-      const prev = state.gastosProgramados[idx];
-      const nuevo = { ...prev, desc, categoria, diaPago, diaCierre };
-      if (esTarjeta) {
-        if (!nuevo.consumos) nuevo.consumos = [];
-        nuevo.monto = calcTotalTarjeta(nuevo);
-      } else {
-        nuevo.monto = monto;
-        delete nuevo.consumos;
-      }
-      state.gastosProgramados[idx] = nuevo;
-    }
+    if (idx !== -1) state.gastosProgramados[idx] = { ...state.gastosProgramados[idx], desc, categoria, diaPago, monto };
   } else {
-    const nuevo = { id: uid(), desc, monto, categoria, diaPago, diaCierre };
-    if (esTarjeta) nuevo.consumos = [];
-    state.gastosProgramados.push(nuevo);
+    state.gastosProgramados.push({ id: uid(), desc, monto, categoria, diaPago });
   }
   saveState();
   closeModal('gastoProgramadoModal');
   render();
-}
-
-// Total de la tarjeta para un mes: cada consumo sabe desde qué resumen entra
-function calcTotalTarjeta(gp, y = state.currentYear, m = state.currentMonth) {
-  return (gp.consumos || []).reduce((s, c) => {
-    const off = mesesEntre(c.desde || mesKey(y, m), y, m);
-    if (off < 0) return s;                              // todavía no entró
-    if (c.cuotas > 1) {
-      const n = (c.cuotaActual || 1) + off;             // cuota que toca este mes
-      return n <= c.cuotas ? s + c.montoPorCuota : s;
-    }
-    return s + (c.monto || 0);
-  }, 0);
-}
-function calcTotalTarjetaProximo(gp) {
-  let y = state.currentYear, m = state.currentMonth + 1;
-  if (m > 11) { m = 0; y++; }
-  return calcTotalTarjeta(gp, y, m);
-}
-function syncTarjetas() {
-  (state.gastosProgramados || []).forEach(g => {
-    if (g.categoria === 'tarjeta_credito') g.monto = calcTotalTarjeta(g);
-  });
-}
-
-// ===== CONSUMOS DE TARJETA =====
-let consumoTarjetaId = null;
-let editingConsumoId = null;
-
-function abrirConsumos(gpId) {
-  consumoTarjetaId = gpId;
-  renderConsumos();
-  document.getElementById('consumosModal').classList.add('open');
-}
-
-function renderConsumos() {
-  const gp = state.gastosProgramados.find(g => g.id === consumoTarjetaId);
-  if (!gp) return;
-  if (!gp.consumos) gp.consumos = [];
-  syncTarjetas();
-
-  const y = state.currentYear, m = state.currentMonth;
-  document.getElementById('consumosTitle').textContent = `💳 ${gp.desc}`;
-  const offDe = c => mesesEntre(c.desde || mesKey(y, m), y, m);
-
-  let html = `
-    <div style="background:linear-gradient(135deg,rgba(100,180,255,.1),rgba(53,241,160,.06));border:1px solid rgba(100,180,255,.25);border-radius:14px;padding:14px 16px;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-size:11px;color:var(--muted)">Resumen de ${MONTHS[m]}</div>
-          <div style="font-size:22px;font-weight:700;color:#64b4ff">${fmt(calcTotalTarjeta(gp))}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:11px;color:var(--muted)">Próximo resumen</div>
-          <div style="font-size:16px;font-weight:600;color:var(--muted)">${fmt(calcTotalTarjetaProximo(gp))}</div>
-        </div>
-      </div>
-      ${gp.diaCierre ? `<div style="font-size:11px;color:var(--muted);margin-top:8px">Cierra el día ${gp.diaCierre}${gp.diaPago ? ` · vence el ${gp.diaPago}` : ''}</div>` : ''}
-    </div>
-    <button class="submit-btn" onclick="openConsumoForm()" style="margin-bottom:6px">➕ Agregar consumo</button>`;
-
-  const fila = (c, off) => {
-    const esCuota = c.cuotas && c.cuotas > 1;
-    let sub, montoTxt, badge = '', activo = true;
-    if (esCuota) {
-      const n = (c.cuotaActual || 1) + off;
-      montoTxt = fmt(c.montoPorCuota);
-      if (n > c.cuotas) { activo = false; sub = `✅ Saldada (${c.cuotas} cuotas)`; }
-      else {
-        sub   = `Cuota ${n} de ${c.cuotas}`;
-        badge = `<span style="font-size:10px;background:rgba(247,208,56,.15);color:var(--yellow);padding:2px 7px;border-radius:6px;font-weight:600">faltan ${c.cuotas - n}</span>`;
-      }
-    } else { montoTxt = fmt(c.monto); sub = '🔁 Mensual fijo'; }
-    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;opacity:${activo ? 1 : .5};cursor:pointer" onclick="openConsumoForm('${c.id}')">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600;color:var(--text)">${c.desc}</div>
-        <div style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-top:2px">${sub} ${badge}</div>
-      </div>
-      <div style="font-size:15px;font-weight:700;color:${activo ? 'var(--red)' : 'var(--muted)'}">-${montoTxt}</div>
-    </div>`;
-  };
-
-  const actuales = [], proximos = [], saldados = [];
-  gp.consumos.forEach(c => {
-    const off = offDe(c);
-    if (off < 0) proximos.push(c);
-    else if (c.cuotas > 1 && (c.cuotaActual || 1) + off > c.cuotas) saldados.push(c);
-    else actuales.push(c);
-  });
-  const seccion = (titulo, arr, offFn) => arr.length
-    ? `<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 8px">${titulo}</div>` + arr.map(c => fila(c, offFn(c))).join('')
-    : '';
-  html += seccion(`Resumen de ${MONTHS[m]} (${actuales.length})`, actuales, offDe);
-  html += seccion(`Próximo resumen (${proximos.length})`, proximos, () => 0);
-  html += seccion('Saldadas', saldados, offDe);
-  if (gp.consumos.length === 0) html += `<div class="empty" style="padding:12px 0"><div>Sin consumos cargados</div></div>`;
-  if (saldados.length) html += `<button onclick="limpiarSaldadas()" style="width:100%;margin-top:6px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);border-radius:12px;padding:10px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">🧹 Quitar ${saldados.length} saldada${saldados.length !== 1 ? 's' : ''}</button>`;
-
-  document.getElementById('consumosBody').innerHTML = html;
-}
-
-function limpiarSaldadas() {
-  const gp = state.gastosProgramados.find(g => g.id === consumoTarjetaId);
-  if (!gp) return;
-  const y = state.currentYear, m = state.currentMonth;
-  gp.consumos = gp.consumos.filter(c => {
-    if (!(c.cuotas > 1)) return true;
-    const off = mesesEntre(c.desde || mesKey(y, m), y, m);
-    return (c.cuotaActual || 1) + off <= c.cuotas;
-  });
-  syncTarjetas(); saveState(); renderConsumos(); renderGastosProgramados();
-}
-
-function openConsumoForm(id = null) {
-  editingConsumoId = id;
-  const gp = state.gastosProgramados.find(g => g.id === consumoTarjetaId);
-  if (!gp) return;
-  const c = id ? (gp.consumos || []).find(x => x.id === id) : null;
-  if (id && !c) return;
-  const del = document.getElementById('cnDeleteBtn');
-
-  const hoy = new Date();
-  let ny = hoy.getFullYear(), nm = hoy.getMonth() + 1; if (nm > 11) { nm = 0; ny++; }
-  const esteKey = mesKey(hoy.getFullYear(), hoy.getMonth());
-  const proxKey = mesKey(ny, nm);
-  const cerro   = gp.diaCierre && hoy.getDate() > gp.diaCierre;
-  const sel = document.getElementById('cnDesde');
-  sel.innerHTML =
-    `<option value="${esteKey}">Este resumen (${MONTHS[hoy.getMonth()]})</option>` +
-    `<option value="${proxKey}">Próximo resumen (${MONTHS[nm]})</option>`;
-  if (c?.desde && ![esteKey, proxKey].includes(c.desde)) {
-    const [dy, dm] = c.desde.split('-').map(Number);
-    sel.innerHTML += `<option value="${c.desde}">${MONTHS[dm - 1]} ${dy}</option>`;
-  }
-  sel.value = c?.desde || (cerro ? proxKey : esteKey);
-
-  if (c) {
-    document.getElementById('consumoFormTitle').textContent = '✏️ Editar Consumo';
-    document.getElementById('cnDesc').value = c.desc;
-    if (c.cuotas && c.cuotas > 1) {
-      setConsumoTipo('cuotas');
-      document.getElementById('cnMontoCuota').value  = c.montoPorCuota;
-      document.getElementById('cnCuotaActual').value = c.cuotaActual;
-      document.getElementById('cnCuotasTotal').value = c.cuotas;
-    } else {
-      setConsumoTipo('unico');
-      document.getElementById('cnMonto').value = c.monto;
-    }
-    del.style.display = 'block';
-  } else {
-    document.getElementById('consumoFormTitle').textContent = '➕ Nuevo Consumo';
-    ['cnDesc','cnMonto','cnMontoCuota','cnCuotaActual','cnCuotasTotal'].forEach(i => document.getElementById(i).value = '');
-    setConsumoTipo('unico');
-    del.style.display = 'none';
-  }
-  document.getElementById('consumoFormModal').classList.add('open');
-  setTimeout(() => document.getElementById('cnDesc').focus(), 350);
-}
-
-function setConsumoTipo(tipo) {
-  document.getElementById('cnTipo').value = tipo;
-  document.getElementById('cnMontoWrap').style.display  = tipo === 'unico'  ? 'block' : 'none';
-  document.getElementById('cnCuotasWrap').style.display = tipo === 'cuotas' ? 'block' : 'none';
-  document.querySelectorAll('.cn-tipo-btn').forEach(b => {
-    const activo = b.dataset.tipo === tipo;
-    b.style.borderColor = activo ? '#64b4ff' : 'var(--border)';
-    b.style.background   = activo ? 'rgba(100,180,255,.12)' : 'var(--surface2)';
-    b.style.color        = activo ? '#64b4ff' : 'var(--text)';
-  });
-}
-
-function saveConsumo() {
-  const gp = state.gastosProgramados.find(g => g.id === consumoTarjetaId);
-  if (!gp) return;
-  if (!gp.consumos) gp.consumos = [];
-
-  const desc = document.getElementById('cnDesc').value.trim();
-  const tipo = document.getElementById('cnTipo').value;
-  if (!desc) { showToast('Ingresá una descripción', 'error'); return; }
-
-  let consumo;
-  if (tipo === 'cuotas') {
-    const montoPorCuota = parseFloat(document.getElementById('cnMontoCuota').value) || 0;
-    const cuotaActual   = parseInt(document.getElementById('cnCuotaActual').value) || 1;
-    const cuotas        = parseInt(document.getElementById('cnCuotasTotal').value) || 1;
-    if (!montoPorCuota) { showToast('Ingresá el monto por cuota', 'error'); return; }
-    if (cuotaActual > cuotas) { showToast('La cuota actual no puede superar el total', 'error'); return; }
-    consumo = { desc, montoPorCuota, cuotaActual, cuotas };
-  } else {
-    const monto = parseFloat(document.getElementById('cnMonto').value) || 0;
-    if (!monto) { showToast('Ingresá el monto', 'error'); return; }
-    consumo = { desc, monto };
-  }
-  consumo.desde = document.getElementById('cnDesde').value;
-
-  if (editingConsumoId) {
-    const idx = gp.consumos.findIndex(x => x.id === editingConsumoId);
-    if (idx !== -1) {
-      const prev = gp.consumos[idx];
-      // Si cambió de cuotas a fijo o viceversa, limpiar campos del otro tipo
-      delete prev.monto; delete prev.montoPorCuota; delete prev.cuotaActual; delete prev.cuotas;
-      gp.consumos[idx] = { ...prev, ...consumo };
-    }
-  } else {
-    gp.consumos.push({ id: uid(), ...consumo });
-  }
-
-  syncTarjetas();
-  saveState();
-  closeModal('consumoFormModal');
-  renderConsumos();
-  renderGastosProgramados();
-  showToast('Consumo guardado');
-}
-
-function deleteConsumo() {
-  if (!editingConsumoId) return;
-  const gp = state.gastosProgramados.find(g => g.id === consumoTarjetaId);
-  if (!gp) return;
-  gp.consumos = gp.consumos.filter(x => x.id !== editingConsumoId);
-  syncTarjetas();
-  saveState();
-  closeModal('consumoFormModal');
-  renderConsumos();
-  renderGastosProgramados();
 }
 
 function deleteGastoProgramado() {
@@ -3568,15 +3525,12 @@ function renderGastosProgramados() {
   const resEl  = document.getElementById('resumenGastosProgramados');
   const listEl = document.getElementById('listGastosProgramados');
   if (!resEl || !listEl) return;
-  syncTarjetas();
 
   const gps   = state.gastosProgramados;
   const total = gps.reduce((s, g) => s + g.monto, 0);
 
-  // Conciliación: gasto real del mes vs estimado (no aplica a tarjetas)
   const txsMes = getTxsForMonth(state.currentMonth, state.currentYear);
   gps.forEach(g => {
-    if (g.categoria === 'tarjeta_credito') { g._realTotal = 0; g._pendingUpdate = false; return; }
     const realTxs = txsMes.filter(t => {
       if (t.type !== 'expense') return false;
       const cuenta = state.cuentas.find(c => c.id === t.cuentaId);
@@ -3644,7 +3598,6 @@ function renderGastosProgramados() {
       const real    = g._realTotal || 0;
       const excede  = g._pendingUpdate;
       const tieneReal = real > 0;
-      const esTarjeta = g.categoria === 'tarjeta_credito';
 
       const barReal  = tieneReal ? Math.min(100, Math.round((real / (excede ? real : g.monto)) * 100)) : 0;
       const barColor = excede ? 'var(--red)' : 'var(--accent2)';
@@ -3688,8 +3641,6 @@ function renderGastosProgramados() {
         ? `<span style="font-size:11px;color:${proxColor};font-weight:600;white-space:nowrap">${proxLabel} · día ${g.diaPago}</span>`
         : (g.diaPago && pagado) ? `<span style="font-size:10px;color:var(--muted)">día ${g.diaPago}</span>` : '';
 
-      const tarjetaProx = esTarjeta ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">Próximo resumen: ${fmt(calcTotalTarjetaProximo(g))}</div>` : '';
-
       return `
       <div style="padding:13px 14px;background:var(--surface);border:1px solid ${pagado ? 'rgba(53,241,160,.3)' : excede ? 'rgba(255,94,94,.3)' : (proxColor ? proxColor : 'var(--border)')};border-left:3px solid ${borderColor};border-radius:14px;margin-bottom:8px;opacity:${pagado ? 0.65 : 1};transition:opacity .2s">
         <div style="display:flex;align-items:center;gap:12px">
@@ -3700,16 +3651,13 @@ function renderGastosProgramados() {
           <div style="flex:1;min-width:0;cursor:pointer" onclick="openGastoProgramadoModal('${g.id}')">
             <div style="font-size:14px;font-weight:600;color:var(--text);${pagado ? 'text-decoration:line-through;color:var(--muted)' : ''}">${g.desc}</div>
             ${fechaBadge ? `<div style="margin-top:2px">${fechaBadge}</div>` : ''}
-            ${tarjetaProx}
-            ${esTarjeta ? '' : concilHtml}
+            ${concilHtml}
           </div>
           <div style="text-align:right;flex-shrink:0;cursor:pointer" onclick="openGastoProgramadoModal('${g.id}')">
             <div style="font-size:15px;font-weight:700;color:${pagado ? 'var(--accent2)' : excede ? 'var(--red)' : (proxColor || '#f1a035')}">-${fmt(g.monto)}</div>
             <div style="font-size:11px;color:var(--muted)">${pagado ? '✓ pagado' : pct + '%'}</div>
           </div>
         </div>
-        ${esTarjeta ? `
-        <button onclick="event.stopPropagation();abrirConsumos('${g.id}')" style="margin-top:8px;width:100%;background:rgba(100,180,255,.1);border:1px solid rgba(100,180,255,.25);color:#64b4ff;border-radius:8px;padding:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">💳 Ver consumos (${(g.consumos||[]).length})</button>` : ''}
         ${updateBtn}
       </div>`;
     }).join('');
@@ -3804,7 +3752,7 @@ function confirmarCargarGastoProg() {
   if (!pendingProgramado) return;
   const gp = pendingProgramado;
 
-  const catCuenta = gp.categoria === 'tarjeta_credito' ? 'gasto_otro' : (gp.categoria || 'gasto_otro');
+  const catCuenta = gp.categoria || 'gasto_otro';
   let cuentaGasto = state.cuentas.find(c => c.tipo === catCuenta && normalizeStr(c.nombre).includes(normalizeStr(gp.desc)))
     || state.cuentas.find(c => c.tipo === catCuenta);
   if (!cuentaGasto) {
@@ -4589,6 +4537,7 @@ function checkPinOnStart() {
 
 // ========== INIT ==========
 loadState();
+migrarTarjetasViejas();
 render();
 checkPinOnStart();
 fetchCotizaciones();
