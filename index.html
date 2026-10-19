@@ -839,16 +839,20 @@
       <div id="yearBars"></div>
     </div>
     <div class="summary-banner" id="homeBanner">
+      <div class="sum-item" style="grid-column:1/-1;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:2px">
+        <label>💵 Disponible <span style="text-transform:none;letter-spacing:0;color:var(--muted)">· plata que podés usar ya</span></label>
+        <div class="val" id="homeDisponible" style="color:var(--accent2);font-size:26px">$0</div>
+      </div>
       <div class="sum-item">
-        <label>Ingresos</label>
+        <label>Ingresos del mes</label>
         <div class="val pos" id="homeIngresos">$0</div>
       </div>
       <div class="sum-item">
-        <label>Gastos</label>
+        <label>Gastos del mes</label>
         <div class="val neg" id="homeGastos">$0</div>
       </div>
       <div class="sum-item" style="grid-column:1/-1">
-        <label>Balance del mes</label>
+        <label>Balance del mes <span style="text-transform:none;letter-spacing:0;color:var(--muted)">· entró − gastaste (no es tu plata)</span></label>
         <div class="val bal" id="homeBalance">$0</div>
       </div>
     </div>
@@ -1215,6 +1219,13 @@
     <div class="form-group">
       <label>Saldo Inicial</label>
       <input id="cSaldo" type="number" placeholder="0.00" step="0.01" />
+    </div>
+    <div class="form-group" id="cDisponibleWrap">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:14px;color:var(--text)">
+        <input id="cDisponible" type="checkbox" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0">
+        💵 Contar como plata disponible
+      </label>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">Tildala para efectivo, bancos y billeteras (plata que podés usar ya). Dejala sin tildar para bienes (ej: la moto), ahorros en dólares o inversiones.</div>
     </div>
     <div id="cTarjetaWrap" style="display:none">
       <div style="display:flex;gap:10px">
@@ -2056,6 +2067,11 @@ function renderInicio() {
   const balEl = document.getElementById('homeBalance');
   balEl.textContent = fmt(bal);
   balEl.className = 'val ' + (bal >= 0 ? 'bal' : 'neg');
+
+  // 💵 Disponible = suma de cuentas marcadas como "plata disponible" (saldo actual)
+  const disp = state.cuentas.filter(c => esDisponible(c)).reduce((s, c) => s + calcSaldo(c), 0);
+  const dispEl = document.getElementById('homeDisponible');
+  if (dispEl) { dispEl.textContent = fmt(disp); dispEl.style.color = disp >= 0 ? 'var(--accent2)' : 'var(--red)'; }
 
   let movs = txs.filter(t => t.type !== 'transfer' || t.transferRole === 'out');
 
@@ -2988,9 +3004,27 @@ function deleteCuenta(id) {
   if (borrarCuenta(id)) render();
 }
 
+// ¿Un tipo de cuenta cuenta como "plata disponible" por defecto?
+function disponiblePorDefecto(tipo) {
+  return ['efectivo','banco','tarjeta_debito'].includes(tipo);
+}
+// Valor efectivo de disponibilidad de una cuenta (respeta la elección del usuario, o usa el default por tipo)
+function esDisponible(c) {
+  if (c.tipo === 'tarjeta_credito' || c.tipo.startsWith('gasto_')) return false;
+  return c.disponible !== undefined ? !!c.disponible : disponiblePorDefecto(c.tipo);
+}
+
 function onCTipoChange() {
-  document.getElementById('cTarjetaWrap').style.display =
-    document.getElementById('cTipo').value === 'tarjeta_credito' ? 'block' : 'none';
+  const tipo = document.getElementById('cTipo').value;
+  document.getElementById('cTarjetaWrap').style.display = tipo === 'tarjeta_credito' ? 'block' : 'none';
+  // El check de "disponible" no aplica a tarjetas de crédito ni cuentas de gasto
+  const dispWrap = document.getElementById('cDisponibleWrap');
+  if (dispWrap) dispWrap.style.display = (tipo === 'tarjeta_credito' || tipo.startsWith('gasto_')) ? 'none' : 'block';
+  // Al crear, ajustar el default del check según el tipo elegido
+  if (!state.editingCuentaId) {
+    const chk = document.getElementById('cDisponible');
+    if (chk) chk.checked = disponiblePorDefecto(tipo);
+  }
 }
 
 function openCuentaModal(mode) {
@@ -3040,6 +3074,7 @@ function editCuenta(id) {
   document.getElementById('cDiaCierre').value = c.diaCierre || '';
   document.getElementById('cDiaPago').value = c.diaPago || '';
   onCTipoChange();
+  document.getElementById('cDisponible').checked = esDisponible(c);
   document.getElementById('cuentaDeleteBtn').style.display = 'block';
   document.getElementById('cuentaModal').classList.add('open');
 }
@@ -3275,6 +3310,10 @@ function saveCuenta() {
     const dc = parseInt(document.getElementById('cDiaCierre').value), dp = parseInt(document.getElementById('cDiaPago').value);
     if (!(dc >= 1 && dc <= 31) || !(dp >= 1 && dp <= 31)) { showToast('Completá día de cierre y vencimiento (1 a 31)', 'error'); return; }
     extra.diaCierre = dc; extra.diaPago = dp;
+  }
+  // Disponibilidad (solo cuentas que no son tarjeta de crédito ni de gasto)
+  if (tipo !== 'tarjeta_credito' && !tipo.startsWith('gasto_')) {
+    extra.disponible = document.getElementById('cDisponible').checked;
   }
   const wasEditingC = !!state.editingCuentaId;
   if (wasEditingC) {
