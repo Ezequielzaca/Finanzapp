@@ -52,7 +52,7 @@
 
   /* HEADER */
   .header {
-    padding: 20px 20px 10px;
+    padding: calc(20px + env(safe-area-inset-top)) 20px 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -113,7 +113,7 @@
     border-top: 1px solid var(--border);
     display: flex;
     justify-content: space-around;
-    padding: 10px 0 calc(18px + env(safe-area-inset-bottom));
+    padding: 8px 0 calc(4px + env(safe-area-inset-bottom));
     z-index: 100;
   }
   .nav-btn {
@@ -149,7 +149,7 @@
   /* CONTENT */
   .content {
     flex: 1;
-    padding: 8px 20px 120px;
+    padding: 8px 20px 100px;
     overflow-y: auto;
   }
   .tab { display: none; }
@@ -610,7 +610,7 @@
 
   /* Floating add button */
   .fab {
-    position: fixed; bottom: calc(60px + 16px + env(safe-area-inset-bottom)); right: 16px;
+    position: fixed; bottom: calc(64px + env(safe-area-inset-bottom)); right: 16px;
     width: 52px; height: 52px; border-radius: 50%;
     background: var(--accent); border: none; color: #000;
     font-size: 26px; font-weight: 300; cursor: pointer;
@@ -794,7 +794,7 @@
 <body>
 
 <!-- PIN LOCK OVERLAY -->
-<div id="pinLockOverlay" style="display:none;position:fixed;inset:0;z-index:5000;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;padding:24px">
+<div id="pinLockOverlay" style="display:none;position:fixed;inset:0;z-index:5000;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top)) 24px 24px">
   <div style="font-size:48px;margin-bottom:8px">🔒</div>
   <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px">FinanzApp</div>
   <div id="pinLockMsg" style="font-size:13px;color:var(--muted);margin-bottom:24px">Ingresá tu PIN</div>
@@ -1218,7 +1218,7 @@
     </div>
     <div id="cTarjetaWrap" style="display:none">
       <div style="display:flex;gap:10px">
-        <div class="form-group" style="flex:1"><label>Día de cierre</label><input id="cDiaCierre" type="number" min="1" max="31" placeholder="28"></div>
+        <div class="form-group" style="flex:1"><label>Día de cierre <span style="color:var(--muted);font-size:11px">(31 = fin de mes)</span></label><input id="cDiaCierre" type="number" min="1" max="31" placeholder="31"></div>
         <div class="form-group" style="flex:1"><label>Día de vencimiento</label><input id="cDiaPago" type="number" min="1" max="31" placeholder="10"></div>
       </div>
       <div style="font-size:11px;color:var(--muted);margin:-6px 0 12px;line-height:1.5">Las compras hasta el día de cierre entran en el resumen de ese mes y se pagan el día de vencimiento del mes siguiente. Si ya debés plata de resúmenes viejos, ponela como saldo inicial negativo.</div>
@@ -3486,7 +3486,7 @@ function openTarjetaDetail(id) {
         <div style="font-size:14px;font-weight:600;color:${prox ? EST_RES[prox.estado][0] : 'var(--muted)'}">${prox ? `${fmt(prox.saldo)} · ${fmtDM(prox.vence)}` : 'Nada pendiente'}</div>
       </div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:8px">Cierra el ${c.diaCierre} · vence el ${c.diaPago}</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">Cierra ${c.diaCierre >= 31 ? 'a fin de mes' : 'el ' + c.diaCierre} · vence el ${c.diaPago}</div>
   </div>
   <button class="submit-btn" style="margin:0 0 14px" onclick="cargarConsumoTarjeta('${c.id}')">➕ Cargar consumo</button>`;
 
