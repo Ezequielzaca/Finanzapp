@@ -176,6 +176,14 @@
   .sum-item .val.neg { color: var(--red); }
   .sum-item .val.bal { color: var(--text); }
 
+  /* INSIGHTS consolidados */
+  .insight-card { display:flex; align-items:center; gap:10px; padding:11px 14px; background:var(--surface); border:1px solid var(--border); border-radius:12px; margin-bottom:12px; }
+  .insight-group { background:var(--surface); border:1px solid var(--border); border-radius:14px; margin-bottom:12px; overflow:hidden; }
+  .insight-group-head { font-size:12px; font-weight:600; color:var(--muted); letter-spacing:.2px; padding:11px 14px 8px; }
+  .insight-row { display:flex; align-items:center; gap:10px; padding:9px 14px; border-top:1px solid var(--border-soft); }
+  .insight-text { font-size:13px; color:var(--text); line-height:1.35; }
+  .insight-dot { width:20px; text-align:center; flex-shrink:0; font-size:14px; }
+
   /* SECTION TITLE */
   .section-title {
     font-size: 11px;
@@ -851,7 +859,7 @@
     </div>
     <div class="summary-banner" id="homeBanner">
       <div class="sum-item" style="grid-column:1/-1;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:2px">
-        <label>💵 Disponible <span style="letter-spacing:0;color:var(--muted)">· plata que podés usar ya</span></label>
+        <label>💵 Disponible <span style="letter-spacing:0;color:var(--muted)">· plata que podés usar ya</span><span id="dispNote" style="letter-spacing:0;color:var(--yellow);font-weight:400"></span></label>
         <div class="val" id="homeDisponible" style="color:var(--accent);font-size:32px;font-weight:700;letter-spacing:-0.02em">$0</div>
       </div>
       <div class="sum-item">
@@ -1058,13 +1066,13 @@
       <div class="modal-title">Nuevo movimiento<div class="modal-close" onclick="closeModal('fabMenu')">✕</div></div>
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px;padding-bottom:32px">
-      <button onclick="closeModal('fabMenu');openModal('income')" style="display:flex;align-items:center;gap:12px;padding:14px;background:rgba(53,241,160,.08);border:1px solid rgba(53,241,160,.2);border-radius:14px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:var(--accent2)">
+      <button onclick="closeModal('fabMenu');openModal('income')" style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:var(--accent2)">
         <span style="font-size:22px">▲</span> Ingreso
       </button>
-      <button onclick="closeModal('fabMenu');openModal('expense')" style="display:flex;align-items:center;gap:12px;padding:14px;background:rgba(255,94,94,.08);border:1px solid rgba(255,94,94,.2);border-radius:14px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:var(--red)">
+      <button onclick="closeModal('fabMenu');openModal('expense')" style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:var(--red)">
         <span style="font-size:22px">▼</span> Gasto
       </button>
-      <button onclick="closeModal('fabMenu');openModal('transfer')" style="display:flex;align-items:center;gap:12px;padding:14px;background:rgba(100,180,255,.08);border:1px solid rgba(100,180,255,.2);border-radius:14px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:#64b4ff">
+      <button onclick="closeModal('fabMenu');openModal('transfer')" style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:var(--blue)">
         <span style="font-size:22px">⇄</span> Transferencia
       </button>
     </div>
@@ -1962,9 +1970,16 @@ function _confirmResolve(val) {
 }
 
 // ========== FILTERED TXs ==========
+// Parsea 'YYYY-MM-DD' en hora LOCAL (evita el corrimiento de día por UTC en Argentina)
+function parseDate(s) {
+  if (s instanceof Date) return s;
+  const p = String(s).slice(0, 10).split('-');
+  return new Date(+p[0], (+p[1] || 1) - 1, +p[2] || 1);
+}
+
 function getTxsForMonth(month, year) {
   return state.transactions.filter(t => {
-    const d = new Date(t.date);
+    const d = parseDate(t.date);
     return d.getMonth() === month && d.getFullYear() === year;
   });
 }
@@ -1977,7 +1992,7 @@ function renderYearBars() {
   const y = state.currentYear;
   const datos = Array.from({length:12}, (_, m) => {
     const txs = state.transactions.filter(t => {
-      const d = new Date(t.date);
+      const d = parseDate(t.date);
       return d.getFullYear() === y && d.getMonth() === m && t.type !== 'transfer';
     });
     return {
@@ -2027,7 +2042,7 @@ function renderInsights() {
   state.cuentas.filter(c => c.tipo === 'tarjeta_credito' && c.diaCierre).forEach(c => {
     resumenesTarjeta(c).filter(r => r.estado === 'cerrado' || r.estado === 'vencido').forEach(r => {
       const dias = Math.ceil((r.vence - new Date()) / 86400000);
-      insights.push({ icon: '💳', color: dias < 0 ? 'var(--red)' : dias <= 5 ? 'var(--yellow)' : '#64b4ff',
+      insights.push({ icon: '💳', color: dias < 0 ? 'var(--red)' : dias <= 5 ? 'var(--yellow)' : 'var(--muted)',
         text: dias < 0 ? `<b>${esc(c.nombre)}</b>: resumen de ${MONTHS[r.m]} vencido hace ${-dias} día${-dias !== 1 ? 's' : ''} (${fmt(r.saldo)})`
                        : `<b>${esc(c.nombre)}</b>: ${fmt(r.saldo)} vence en ${dias} día${dias !== 1 ? 's' : ''}` });
     });
@@ -2057,11 +2072,20 @@ function renderInsights() {
   }
 
   if (insights.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML = insights.slice(0, 3).map(ins => `
-    <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--surface);border:1px solid var(--border);border-left:3px solid ${ins.color};border-radius:12px;margin-bottom:8px">
-      <span style="font-size:18px">${ins.icon}</span>
-      <span style="font-size:13px;color:var(--text);line-height:1.4">${ins.text}</span>
-    </div>`).join('');
+  const items = insights.slice(0, 4);
+  if (items.length === 1) {
+    const ins = items[0];
+    el.innerHTML = `<div class="insight-card" style="border-left:3px solid ${ins.color}">
+      <span class="insight-dot">${ins.icon}</span>
+      <span class="insight-text">${ins.text}</span></div>`;
+  } else {
+    el.innerHTML = `<div class="insight-group">
+      <div class="insight-group-head">Tenés ${items.length} cosas para revisar</div>
+      ${items.map(ins => `<div class="insight-row">
+        <span class="insight-dot" style="color:${ins.color}">${ins.icon}</span>
+        <span class="insight-text">${ins.text}</span></div>`).join('')}
+    </div>`;
+  }
 }
 
 // ========== TAB 1: INICIO ==========
@@ -2082,7 +2106,15 @@ function renderInicio() {
   // 💵 Disponible = suma de cuentas marcadas como "plata disponible" (saldo actual)
   const disp = state.cuentas.filter(c => esDisponible(c)).reduce((s, c) => s + calcSaldo(c), 0);
   const dispEl = document.getElementById('homeDisponible');
-  if (dispEl) { dispEl.textContent = fmt(disp); dispEl.style.color = disp >= 0 ? 'var(--accent)' : 'var(--red)'; }
+  const hoy = new Date();
+  const esMesActual = state.currentMonth === hoy.getMonth() && state.currentYear === hoy.getFullYear();
+  if (dispEl) {
+    dispEl.textContent = fmt(disp);
+    dispEl.style.color = disp >= 0 ? 'var(--accent)' : 'var(--red)';
+    dispEl.style.opacity = esMesActual ? '1' : '.5';
+  }
+  const dispNote = document.getElementById('dispNote');
+  if (dispNote) dispNote.textContent = esMesActual ? '' : ' · es tu saldo de hoy, no de este mes';
 
   let movs = txs.filter(t => t.type !== 'transfer' || t.transferRole === 'out');
 
@@ -2098,7 +2130,7 @@ function renderInicio() {
 
   const byDay = {};
   movs.forEach(t => {
-    const d = new Date(t.date);
+    const d = parseDate(t.date);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     if (!byDay[key]) byDay[key] = [];
     byDay[key].push(t);
@@ -2368,7 +2400,7 @@ function renderResumen() {
   if (f === 'transferencias') {
     const transfers = state.transactions
       .filter(t => t.type === 'transfer' && t.transferRole === 'out')
-      .sort((a,b) => new Date(b.date) - new Date(a.date));
+      .sort((a,b) => parseDate(b.date) - parseDate(a.date));
     if (transfers.length === 0) { el.innerHTML = '<div class="empty"><div>Sin transferencias registradas</div></div>'; return; }
     el.innerHTML = transfers.map(t => {
       const origenC  = state.cuentas.find(c => c.id === t.cuentaId);
@@ -2376,7 +2408,7 @@ function renderResumen() {
       const destinoC = destinoT ? state.cuentas.find(c => c.id === destinoT.cuentaId) : null;
       const origenNom  = origenC  ? `${TIPO_INFO[origenC.tipo]?.icon  || ''} ${origenC.nombre}`  : '?';
       const destinoNom = destinoC ? `${TIPO_INFO[destinoC.tipo]?.icon || ''} ${esc(destinoC.nombre)}` : '?';
-      const fechaTxt = new Date(t.date).toLocaleDateString('es-AR', {day:'2-digit', month:'short', year:'numeric'});
+      const fechaTxt = parseDate(t.date).toLocaleDateString('es-AR', {day:'2-digit', month:'short', year:'numeric'});
       return `
       <div class="tx-row" onclick="editTx('${t.id}')">
         <div class="tx-dot" style="background:rgba(100,180,255,.15);color:#64b4ff;font-size:14px">⇄</div>
@@ -2434,7 +2466,7 @@ function renderResumen() {
   if (f === 'anio') {
     transactions.forEach(t => {
       if (t.type === 'transfer') return;
-      const y = new Date(t.date).getFullYear();
+      const y = parseDate(t.date).getFullYear();
       if (!groups[y]) groups[y] = { income: 0, expense: 0, txs: 0 };
       if (t.type === 'income') groups[y].income += t.monto; else groups[y].expense += t.monto;
       groups[y].txs++;
@@ -2457,7 +2489,7 @@ function renderResumen() {
   } else {
     getTxsForMonth(currentMonth, currentYear).forEach(t => {
       if (t.type === 'transfer') return;
-      const key = new Date(t.date).toLocaleDateString('es-AR', {weekday:'short', day:'2-digit', month:'short'});
+      const key = parseDate(t.date).toLocaleDateString('es-AR', {weekday:'short', day:'2-digit', month:'short'});
       if (!groups[key]) groups[key] = { income: 0, expense: 0, txs: 0 };
       if (t.type === 'income') groups[key].income += t.monto; else groups[key].expense += t.monto;
       groups[key].txs++;
@@ -2567,7 +2599,7 @@ function buildYearBreakdown(cuenta) {
   if (txs.length === 0) return '';
   const byYear = {};
   txs.forEach(t => {
-    const d = new Date(t.date);
+    const d = parseDate(t.date);
     const y = d.getFullYear(), m = d.getMonth();
     if (!byYear[y]) byYear[y] = {};
     if (!byYear[y][m]) byYear[y][m] = 0;
@@ -2729,14 +2761,15 @@ function renderBudgetRings() {
       const matchConcepto = normalizeStr(t.concepto).includes(normalizeStr(g.desc)) || normalizeStr(g.desc).includes(normalizeStr(t.concepto));
       return matchCuenta || matchConcepto;
     }).reduce((s, t) => s + t.monto, 0);
-    const pct = g.monto > 0 ? Math.min(100, Math.round((gastado / g.monto) * 100)) : 0;
-    return { ...g, gastado, pct };
+    const pctRaw = g.monto > 0 ? Math.round((gastado / g.monto) * 100) : 0;
+    const pct = Math.min(100, pctRaw);
+    return { ...g, gastado, pct, pctRaw };
   });
 
   const ringHtml = rings.map(r => {
     const info = TIPO_INFO[r.categoria] || { icon: ICONOS.otro, label: 'Otro' };
-    const color = r.pct >= 100 ? 'var(--red)' : r.pct >= 70 ? 'var(--yellow)' : 'var(--accent2)';
-    const spentClass = r.pct >= 100 ? 'over' : r.pct >= 70 ? 'warn' : 'ok';
+    const color = r.pctRaw > 100 ? 'var(--red)' : r.pctRaw >= 85 ? 'var(--yellow)' : 'var(--accent2)';
+    const spentClass = r.pctRaw > 100 ? 'over' : r.pctRaw >= 85 ? 'warn' : 'ok';
     const radius = 30, circ = 2 * Math.PI * radius;
     const dash = (r.pct / 100) * circ;
     return `<div class="br-item" onclick="openGastoProgramadoModal('${r.id}')">
@@ -2764,7 +2797,10 @@ function renderCuentasGastos() {
   const strip = document.getElementById('capitalStripGastos');
   const gasCuentas = state.cuentas.filter(c => c.tipo.startsWith('gasto_'));
   const totalGastos = gasCuentas.reduce((s,c) => s + Math.abs(calcSaldo(c)), 0);
-  strip.innerHTML = `<div class="cs-row"><span class="cs-label">Total gastado acumulado</span><span class="cs-val neg">-${fmt(totalGastos)}</span></div>`;
+  const gastoMes = getTxsForMonth(state.currentMonth, state.currentYear).filter(t => t.type === 'expense').reduce((s,t) => s + t.monto, 0);
+  strip.innerHTML = `
+    <div class="cs-row"><span class="cs-label">Gastado este mes</span><span class="cs-val neg">-${fmt(gastoMes)}</span></div>
+    <div class="cs-row"><span class="cs-label" style="color:var(--muted)">Acumulado histórico</span><span class="cs-val" style="color:var(--muted)">-${fmt(totalGastos)}</span></div>`;
 
   const el = document.getElementById('listCuentasGastos');
   if (gasCuentas.length === 0) {
@@ -2882,7 +2918,7 @@ function editTx(id) {
   state.txType = t.type;
   updateTxTypeUI();
 
-  const d = new Date(t.date);
+  const d = parseDate(t.date);
   document.getElementById('txFecha').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   document.getElementById('txMonto').value = t.monto;
   document.getElementById('txConcepto').value = t.concepto;
@@ -2974,7 +3010,7 @@ function openCuentaDetail(id) {
     if (t.type === 'transfer') return t.cuentaId === id;
     if (t.type === 'expense' && t.origenId === id) return true;
     return t.cuentaId === id;
-  }).sort((a,b) => new Date(b.date) - new Date(a.date));
+  }).sort((a,b) => parseDate(b.date) - parseDate(a.date));
 
   let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding:12px;background:var(--surface2);border-radius:12px">
     <span style="font-size:13px;color:var(--muted)">Saldo actual</span>
@@ -2985,7 +3021,7 @@ function openCuentaDetail(id) {
     html += `<div class="empty"><div>Sin movimientos</div></div>`;
   } else {
     html += txs.map(t => {
-      const d = new Date(t.date);
+      const d = parseDate(t.date);
       const fechaTxt = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
       let sub = '', amtClass = 'pos', amtTxt = '';
       if (t.type === 'transfer') {
@@ -3516,7 +3552,7 @@ function calcNominalUSD(cuenta) {
 
 // ========== TARJETAS DE CRÉDITO: RESÚMENES ==========
 function resumenDeFecha(fecha, diaCierre, diaPago) {
-  const d = new Date(fecha);
+  const d = parseDate(fecha);
   let y = d.getFullYear(), m = d.getMonth();
   const ult = (yy, mm) => new Date(yy, mm + 1, 0).getDate();
   if (d.getDate() > Math.min(diaCierre, ult(y, m))) { m++; if (m > 11) { m = 0; y++; } }
@@ -3554,7 +3590,8 @@ function resumenesTarjeta(cuenta) {
 }
 
 let tarjetaDetailId = null, pagoResumenKey = null;
-const EST_RES = { abierto: ['#64b4ff', 'Abierto'], cerrado: ['#f7d038', 'A pagar'], vencido: ['#ff5e5e', 'Vencido'], pagado: ['#35f1a0', 'Pagado'] };
+const EST_RES = { abierto: ['var(--muted)', 'Abierto'], cerrado: ['var(--accent)', 'A pagar'], vencido: ['var(--red)', 'Vencido'], pagado: ['var(--accent2)', 'Pagado'] };
+const PRIO_RES = { vencido: 0, cerrado: 1, abierto: 2, pagado: 3 };
 const fmtDM = d => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 
 function openTarjetaDetail(id) {
@@ -3565,37 +3602,40 @@ function openTarjetaDetail(id) {
   document.getElementById('tarjetaTitle').textContent = `💳 ${esc(c.nombre)}`;
   const res = resumenesTarjeta(c);
   const deuda = -calcSaldo(c);
+  const aPagar = res.filter(r => r.estado === 'cerrado' || r.estado === 'vencido').reduce((s, r) => s + r.saldo, 0);
   const prox = [...res].reverse().find(r => r.estado === 'cerrado' || r.estado === 'vencido');
 
   let html = `<div style="background:var(--surface2);border-radius:14px;padding:14px 16px;margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px">
       <div>
-        <div style="font-size:11px;color:var(--muted);letter-spacing:.5px">Deuda total</div>
-        <div style="font-size:26px;font-weight:700;color:${deuda > 0 ? 'var(--red)' : 'var(--accent2)'}">${fmt(deuda)}</div>
+        <div style="font-size:11px;color:var(--muted);letter-spacing:.5px">A pagar ahora</div>
+        <div style="font-size:26px;font-weight:700;color:${aPagar > 0.005 ? 'var(--accent)' : 'var(--accent2)'}">${aPagar > 0.005 ? fmt(aPagar) : 'Al día ✓'}</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:11px;color:var(--muted);letter-spacing:.5px">Próximo vencimiento</div>
         <div style="font-size:14px;font-weight:600;color:${prox ? EST_RES[prox.estado][0] : 'var(--muted)'}">${prox ? `${fmt(prox.saldo)} · ${fmtDM(prox.vence)}` : 'Nada pendiente'}</div>
       </div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:8px">Cierra ${c.diaCierre >= 31 ? 'a fin de mes' : 'el ' + c.diaCierre} · vence el ${c.diaPago}</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">Deuda total con cuotas futuras: <b style="color:var(--text);font-weight:600">${fmt(deuda)}</b></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:3px">Cierra ${c.diaCierre >= 31 ? 'a fin de mes' : 'el ' + c.diaCierre} · vence el ${c.diaPago}</div>
   </div>
   <button class="submit-btn" style="margin:0 0 14px" onclick="cargarConsumoTarjeta('${c.id}')">➕ Cargar consumo</button>`;
 
-  html += res.map(r => {
+  const resOrden = [...res].sort((a, b) => (PRIO_RES[a.estado] - PRIO_RES[b.estado]) || a.key.localeCompare(b.key));
+  html += resOrden.map(r => {
     const [col, lbl] = EST_RES[r.estado];
     const fechas = r.estado === 'abierto'
       ? `cierra el ${fmtDM(r.cierre)} · vence el ${fmtDM(r.vence)}`
       : `cerró el ${fmtDM(r.cierre)} · ${r.estado === 'pagado' ? 'pagado' : 'vence el ' + fmtDM(r.vence)}`;
-    const filas = [...r.consumos].sort((a, b) => new Date(b.date) - new Date(a.date)).map(t => `
+    const filas = [...r.consumos].sort((a, b) => parseDate(b.date) - parseDate(a.date)).map(t => `
       <div class="day-tx" style="padding:8px 0" onclick="closeModal('tarjetaModal');editTx('${t.id}')">
         <div class="day-tx-info"><div class="day-tx-concept">${esc(t.concepto)}</div>
-          <div class="day-tx-sub">${fmtDM(new Date(t.date))}${t.cuotasTotal ? ' · cuota ' + t.cuotaN + '/' + t.cuotasTotal : ''}</div></div>
+          <div class="day-tx-sub">${fmtDM(parseDate(t.date))}${t.cuotasTotal ? ' · cuota ' + t.cuotaN + '/' + t.cuotasTotal : ''}</div></div>
         <div class="day-tx-amount neg">-${fmt(t.monto)}</div>
       </div>`).join('')
       + r.pagos.map(t => `
       <div class="day-tx" style="padding:8px 0" onclick="closeModal('tarjetaModal');editTx('${t.id}')">
-        <div class="day-tx-info"><div class="day-tx-concept">${esc(t.concepto)}</div><div class="day-tx-sub">${fmtDM(new Date(t.date))}</div></div>
+        <div class="day-tx-info"><div class="day-tx-concept">${esc(t.concepto)}</div><div class="day-tx-sub">${fmtDM(parseDate(t.date))}</div></div>
         <div class="day-tx-amount pos">+${fmt(t.monto)}</div>
       </div>`).join('');
     const expandido = r.estado === 'cerrado' || r.estado === 'vencido';
@@ -3924,7 +3964,7 @@ function detectarRecurrentes() {
     const key = normalizeStr(cuenta.nombre);
     if (!porCuenta[key]) porCuenta[key] = { desc: cuenta.nombre, tipo: cuenta.tipo, montos: [], meses: new Set() };
     porCuenta[key].montos.push(t.monto);
-    const d = new Date(t.date);
+    const d = parseDate(t.date);
     porCuenta[key].meses.add(`${d.getFullYear()}-${d.getMonth()}`);
   });
   const porConcepto = {};
@@ -3932,7 +3972,7 @@ function detectarRecurrentes() {
     const key = normalizeStr(t.concepto);
     if (!porConcepto[key]) porConcepto[key] = { desc: t.concepto, tipo: 'gasto_otro', montos: [], meses: new Set() };
     porConcepto[key].montos.push(t.monto);
-    const d = new Date(t.date);
+    const d = parseDate(t.date);
     porConcepto[key].meses.add(`${d.getFullYear()}-${d.getMonth()}`);
   });
   const candidatos = { ...porCuenta };
@@ -4083,8 +4123,8 @@ function renderGastosHormiga() {
     ${catsSorted.map(([cat, data], idx) => {
       const info = TIPO_INFO[cat] || { icon: ICONOS.otro, label: 'Otro' };
       const pct  = Math.round((data.total / total) * 100);
-      const txRows = data.txs.sort((a, b) => new Date(b.date) - new Date(a.date)).map(t => {
-        const d = new Date(t.date);
+      const txRows = data.txs.sort((a, b) => parseDate(b.date) - parseDate(a.date)).map(t => {
+        const d = parseDate(t.date);
         const fecha = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer" onclick="editTx('${t.id}')">
           <div>
